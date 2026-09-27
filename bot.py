@@ -225,7 +225,7 @@ def auto_update_channel_message():
     try:
         banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
         caption_text = "💎 = <b>حساب السهرة المميز</b>  |  🔥 = <b>الأكثر طلباً</b>"
-        media = InputMediaPhoto(banner_image_url, caption=caption_text, parse_mode="HTML")
+        media = InputMediaPhoto(banner_image_url, parse_mode="HTML")
         bot.edit_message_media(
             media=media,
             chat_id=CHANNEL_ID,
@@ -294,13 +294,12 @@ def post_table_to_channel(admin_chat_id):
 
     try:
         banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
-        caption_text = "💎 = <b>حساب السهرة المميز</b>  |  🔥 = <b>الأكثر طلباً</b>"
         
         if last_posted_id is None:
             sent_msg = bot.send_photo(
                 CHANNEL_ID, 
                 banner_image_url,
-                caption=caption_text,
+                
                 parse_mode="HTML",
                 reply_markup=channel_booking_markup()
             )
@@ -309,7 +308,7 @@ def post_table_to_channel(admin_chat_id):
             bot.send_message(admin_chat_id, "تم النشر والتثبيت في القناة بنجاح ✅", reply_markup=main_menu_markup(admin_chat_id))
         else:
             try:
-                media = InputMediaPhoto(banner_image_url, caption=caption_text, parse_mode="HTML")
+                media = InputMediaPhoto(banner_image_url, parse_mode="HTML")
                 bot.edit_message_media(
                     media=media,
                     chat_id=CHANNEL_ID,
@@ -325,7 +324,6 @@ def post_table_to_channel(admin_chat_id):
                     sent_msg = bot.send_photo(
                         CHANNEL_ID, 
                         banner_image_url, 
-                        caption=caption_text,
                         parse_mode="HTML",
                         reply_markup=channel_booking_markup()
                     )
