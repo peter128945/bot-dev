@@ -18,7 +18,7 @@ if not MONGO_URI:
     MONGO_URI = "mongodb+srv://peter128945:peter128945@telegrambot.nvnzi6z.mongodb.net/?appName=TelegramBot"
 
 mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["telegram_bot_v2"]
+db = mongo_client["telegram_bot_dev"]
 accounts_col = db["accounts"]
 settings_col = db["settings"]
 
