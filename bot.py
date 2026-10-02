@@ -612,7 +612,6 @@ elif call.data.startswith("delete_"):
             acc["name"] = f"Account {index + 1}"
             
         accounts_col.delete_many({})
-        
         if remaining_accounts:
             accounts_col.insert_many(remaining_accounts)
             
