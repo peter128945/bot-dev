@@ -126,7 +126,7 @@ def format_minutes_to_time_str(minutes):
 def compress_time(t_str):
     if not t_str: return ""
     # تحويل النص ليكون بحروف صغيرة am / pm وإزالة المسافات
-    t = t_str.lower()
+    t = t_str.upper()
     t = t.replace(":00", "") 
     t = t.replace(":", ".")  
     t = t.replace(" ", "")   
@@ -163,7 +163,7 @@ def channel_booking_markup():
             
             if t_from and t_to:
                 # حذف am أو pm من وقت البداية في كل الحالات لتوفير المساحة
-                if t_from.endswith('pm') or t_from.endswith('am'):
+                if t_from.endswith('PM') or t_from.endswith('AM'):
                     t_from = t_from[:-2]
                 
                 status_text = f"❌{t_from}-{t_to}"
@@ -188,7 +188,7 @@ def main_menu_markup(chat_id):
     # واجهة الأدمن (عربي)
     for acc in load_accounts():
         if acc["reserved"]:
-            status_str = f"من {acc['time_from']} إلى {acc['time_to']}" if acc['time_from'] else f"حتى {acc['time_to']}"
+            status_str = f"From {acc['time_from']} To {acc['time_to']}" if acc['time_from'] else f"To {acc['time_to']}"
             client_tag = f" | @{acc['client_username']}" if acc.get("client_username") else ""
             status_icon = f"❌ {status_str}{client_tag}"
         else:
