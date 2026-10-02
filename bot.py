@@ -8,7 +8,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMedia
 from flask import Flask
 from pymongo import MongoClient
 
-# التوكين ويوزر القناة الخاصين بك
+# التوكين ويوزر القناة الخاصين بالـ Dev
 API_TOKEN = '8949480557:AAGcv4NC8wrcXd2ls1PPRtersqAIa7RGQJg'
 CHANNEL_ID = '@Client128945'
 
@@ -21,13 +21,14 @@ mongo_client = MongoClient(MONGO_URI)
 db = mongo_client["telegram_bot_dev"]
 accounts_col = db["accounts"]
 settings_col = db["settings"]
+sales_col = db["sales"]
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is running!"
+    return "Bot is running with Sales Reports!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -125,12 +126,61 @@ def format_minutes_to_time_str(minutes):
 
 def compress_time(t_str):
     if not t_str: return ""
-    # تحويل النص ليكون بحروف صغيرة am / pm وإزالة المسافات
     t = t_str.upper()
     t = t.replace(":00", "") 
     t = t.replace(":", ".")  
     t = t.replace(" ", "")   
     return t
+
+# --- دالة استخراج التقارير الجديدة ---
+def generate_sales_report():
+    egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
+    today_str = egypt_time.strftime("%Y-%m-%d")
+    month_str = egypt_time.strftime("%Y-%m")
+    start_of_week_date = (egypt_time - timedelta(days=egypt_time.weekday())).date() # الإثنين هو بداية الأسبوع
+
+    daily_total, daily_count = 0.0, 0
+    weekly_total, weekly_count = 0.0, 0
+    monthly_total, monthly_count = 0.0, 0
+
+    for sale in sales_col.find():
+        price = float(sale.get("price", 0))
+        d_str = sale.get("date_str", "")
+        
+        # مبيعات اليوم
+        if d_str == today_str:
+            daily_total += price
+            daily_count += 1
+            
+        # مبيعات الشهر
+        if d_str.startswith(month_str):
+            monthly_total += price
+            monthly_count += 1
+            
+        # مبيعات الأسبوع
+        try:
+            sale_date = datetime.strptime(d_str, "%Y-%m-%d").date()
+            if sale_date >= start_of_week_date:
+                weekly_total += price
+                weekly_count += 1
+        except:
+            pass
+
+    report = (
+        f"<b>📊 تقارير المبيعات والأرباح</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"<b>📅 اليوم:</b>\n"
+        f"▪️ الحجوزات: {daily_count} حجز\n"
+        f"▪️ الأرباح: {daily_total:g}$\n\n"
+        f"<b>🗓 هذا الأسبوع:</b>\n"
+        f"▪️ الحجوزات: {weekly_count} حجز\n"
+        f"▪️ الأرباح: {weekly_total:g}$\n\n"
+        f"<b>📆 هذا الشهر:</b>\n"
+        f"▪️ الحجوزات: {monthly_count} حجز\n"
+        f"▪️ الأرباح: {monthly_total:g}$\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    return report
 
 def channel_booking_markup():
     markup = InlineKeyboardMarkup()
@@ -138,7 +188,6 @@ def channel_booking_markup():
     total_accounts = len(accounts)
     available_accounts = sum(1 for acc in accounts if not acc["reserved"])
     
-    # واجهة العميل (إنجليزي)
     header_title = f"💼 Acc Status ({available_accounts} of {total_accounts} Available) 💼"
     markup.add(InlineKeyboardButton(header_title, callback_data="ignore"))
     
@@ -149,7 +198,6 @@ def channel_booking_markup():
     
     for a in accounts:
         is_account_vip = a.get("is_vip", False)
-        
         display_name = "💎 VIP Account" if is_account_vip else a['name']
         booking_intent = f"I want to book the VIP account 💎 ({a['name']}) for the evening" if is_account_vip else f"I want to book or inquire about {a['name']}"
         
@@ -162,13 +210,10 @@ def channel_booking_markup():
             t_to = compress_time(a['time_to'])
             
             if t_from and t_to:
-                # حذف am أو pm من وقت البداية في كل الحالات لتوفير المساحة
                 if t_from.endswith('PM') or t_from.endswith('AM'):
                     t_from = t_from[:-2]
-                
                 status_text = f"❌{t_from}-{t_to}"
             elif t_to:
-                # استخدام To بدلاً من Until لتوفير مساحة في شاشة الموبايل
                 status_text = f"❌To {t_to}"
             else:
                 status_text = "❌Busy"
@@ -182,10 +227,8 @@ def channel_booking_markup():
         
     return markup
 
-
 def main_menu_markup(chat_id):
     markup = InlineKeyboardMarkup()
-    # واجهة الأدمن (عربي)
     for acc in load_accounts():
         if acc["reserved"]:
             status_str = f"From {acc['time_from']} To {acc['time_to']}" if acc['time_from'] else f"To {acc['time_to']}"
@@ -205,7 +248,10 @@ def main_menu_markup(chat_id):
         )
         
     markup.add(InlineKeyboardButton("➕ إضافة حساب جديد", callback_data="add_account"))
-    markup.add(InlineKeyboardButton("📢 نشر / تحديث الجدول في القناة", callback_data="post_now"))
+    markup.row(
+        InlineKeyboardButton("📢 نشر / تحديث الجدول", callback_data="post_now"),
+        InlineKeyboardButton("📊 تقارير المبيعات", callback_data="sales_report")
+    )
     return markup
 
 
@@ -254,7 +300,6 @@ def check_expiration_loop():
             accounts_data = load_accounts()
             for acc in accounts_data:
                 if acc["reserved"] and acc["time_to"]:
-                    # النظام الجديد يعتمد على التاريخ والوقت المطلق
                     if acc.get("expire_ts"):
                         time_diff_minutes = (acc["expire_ts"] - now_ts) / 60.0
                         
@@ -262,13 +307,11 @@ def check_expiration_loop():
                             acc["warned_near_expiry"] = True
                             save_account(acc)
                             
-                            # تنبيه للأدمن (عربي)
                             alert_msg = f"⚠️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
                             
                             alert_markup = None
                             if acc.get("client_username"):
                                 alert_markup = InlineKeyboardMarkup()
-                                # رسالة التنبيه التي تذهب للعميل (إنجليزي)
                                 ready_msg = f"Hello, alert regarding your booking for ({acc['name']}): time will end in 5 minutes ⏳. Would you like to renew?"
                                 encoded_ready_msg = urllib.parse.quote(ready_msg)
                                 client_url = f"https://t.me/{acc['client_username']}?text={encoded_ready_msg}"
@@ -288,7 +331,6 @@ def check_expiration_loop():
                             save_account(acc)
                             updated = True
                             
-                    # نظام احتياطي (Fallback) للحجوزات القديمة اللي متسجلتش بالتاريخ
                     else:
                         target_minutes = parse_time_to_minutes(acc["time_to"])
                         if target_minutes is not None and now_minutes is not None:
@@ -400,6 +442,31 @@ def handle_callbacks(call):
         return
 
     active_admin_panels[call.message.chat.id] = call.message.message_id
+
+    # --- استدعاء التقارير والرجوع للرئيسية ---
+    if call.data == "sales_report":
+        report_text = generate_sales_report()
+        back_markup = InlineKeyboardMarkup()
+        back_markup.add(InlineKeyboardButton("🔙 رجوع للوحة التحكم", callback_data="back_to_main"))
+        bot.edit_message_text(
+            report_text,
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode="HTML",
+            reply_markup=back_markup
+        )
+        return
+        
+    elif call.data == "back_to_main":
+        bot.edit_message_text(
+            "<b>لوحة تحكم الحسابات ⚙️</b>\nاضغط على أي حساب لتغيير حالته:", 
+            call.message.chat.id, 
+            call.message.message_id, 
+            parse_mode="HTML", 
+            reply_markup=main_menu_markup(call.message.chat.id)
+        )
+        return
+    # ----------------------------------------
 
     if call.data == "post_now":
         bot.answer_callback_query(call.id, "جاري تحديث منشور القناة...")
@@ -530,7 +597,6 @@ def handle_callbacks(call):
             )
             bot.register_next_step_handler(msg, process_time_input_start_end, acc_id)
 
-    # --- معالجة طلب الفاتورة ---
     elif call.data.startswith("invoice_"):
         parts = call.data.split("_")
         action = parts[1]
@@ -598,7 +664,6 @@ def process_time_input_end_only(message, acc_id):
         active_admin_panels[message.chat.id] = sent_msg.message_id
         return
 
-    # حساب التاريخ والوقت لتخزينه
     egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
     target_dt = egypt_time.replace(hour=target_minutes // 60, minute=target_minutes % 60, second=0, microsecond=0)
     
@@ -647,7 +712,6 @@ def process_time_input_start_end(message, acc_id):
         active_admin_panels[message.chat.id] = sent_msg.message_id
         return
         
-    # حساب التاريخ والوقت لتخزينه
     egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
     target_dt = egypt_time.replace(hour=end_minutes // 60, minute=end_minutes % 60, second=0, microsecond=0)
     
@@ -683,7 +747,6 @@ def process_client_username(message, acc_id):
         acc["client_username"] = ""
         
     save_account(acc)
-    
     auto_update_channel_message()
     
     invoice_markup = InlineKeyboardMarkup()
@@ -705,7 +768,28 @@ def process_invoice_price(message, acc_id):
     acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
     if not acc: return
     
-    # واجهة الأدمن (عربي)
+    clean_price_str = price_text.replace("$", "").strip()
+    try:
+        numeric_price = float(clean_price_str)
+    except ValueError:
+        numeric_price = 0.0
+
+    egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
+    
+    sale_data = {
+        "account_id": acc["id"],
+        "account_name": acc["name"],
+        "is_vip": acc.get("is_vip", False),
+        "price": numeric_price,
+        "client_username": acc.get("client_username", ""),
+        "booking_from": acc["time_from"],
+        "booking_to": acc["time_to"],
+        "timestamp": egypt_time,
+        "date_str": egypt_time.strftime("%Y-%m-%d"), 
+        "time_str": egypt_time.strftime("%I:%M %p")
+    }
+    sales_col.insert_one(sale_data)
+
     time_display_admin = f"من {acc['time_from']} إلى {acc['time_to']}" if acc['time_from'] else f"حتى {acc['time_to']}"
     acc_name_display_admin = "حساب VIP 💎" if acc.get("is_vip") else acc['name']
     
@@ -723,7 +807,6 @@ def process_invoice_price(message, acc_id):
         f"لاستلام بيانات الدخول فوراً ✅</i>"
     )
 
-    # واجهة العميل (إنجليزي)
     time_display_client = f"From {acc['time_from']} to {acc['time_to']}" if acc['time_from'] else f"To {acc['time_to']}"
     acc_name_display_client = "💎 VIP Account 💎" if acc.get("is_vip") else acc['name']
 
@@ -754,7 +837,7 @@ def process_invoice_price(message, acc_id):
 
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>الفاتورة جاهزة:</b>\n\n{admin_invoice_text}", 
+        f"<b>الفاتورة جاهزة وتم حفظ المبيعة ✅:</b>\n\n{admin_invoice_text}", 
         parse_mode="HTML", 
         reply_markup=client_action_markup
     )
@@ -785,5 +868,5 @@ if __name__ == '__main__':
     t = Thread(target=check_expiration_loop, daemon=True)
     t.start()
     
-    print("Admin bot running successfully with MongoDB persistence & Flask & VIP & Invoices...")
+    print("Dev bot running successfully with Sales Reports Button...")
     bot.infinity_polling()
