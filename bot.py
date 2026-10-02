@@ -602,7 +602,6 @@ def handle_callbacks(call):
             auto_update_channel_message()
 elif call.data.startswith("delete_"):
         acc_id = int(call.data.split("_")[1])
-        sales_col.update_many({"account_id": acc_id}, {"$set": {"account_id": None}})
         delete_account_from_db(acc_id)
         
         remaining_accounts = load_accounts()
@@ -611,6 +610,7 @@ elif call.data.startswith("delete_"):
             acc["name"] = f"Account {index + 1}"
             
         accounts_col.delete_many({})
+        
         if remaining_accounts:
             accounts_col.insert_many(remaining_accounts)
             
@@ -622,7 +622,7 @@ elif call.data.startswith("delete_"):
             parse_mode="HTML", 
             reply_markup=main_menu_markup(call.message.chat.id)
         )
-        auto_update_channel_message()      
+        auto_update_channel_message()
     elif call.data.startswith("toggle_"):
         acc_id = int(call.data.split("_")[1])
         acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
