@@ -9,7 +9,7 @@ from flask import Flask
 from pymongo import MongoClient
 
 # التوكين ويوزر القناة الخاصين بك
-API_TOKEN = '8949480557:AAEKtRsRNXzKl0NVvtZseQk0oBw7_C6VrYU'
+API_TOKEN = '8949480557:AAGcv4NC8wrcXd2ls1PPRtersqAIa7RGQJg'
 CHANNEL_ID = '@Client128945'
 
 # إعدادات الاتصال بـ MongoDB
