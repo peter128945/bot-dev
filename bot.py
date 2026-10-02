@@ -9,8 +9,8 @@ from flask import Flask
 from pymongo import MongoClient
 
 # التوكين ويوزر القناة الخاصين بك
-API_TOKEN = '8949480557:AAEKtRsRNXzKl0NVvtZseQk0oBw7_C6VrYU'
-CHANNEL_ID = '@Client128945'
+API_TOKEN = '8772014434:AAEozCH_-FK3AL7A7KhOIRtG41DUouBOPsQ'
+CHANNEL_ID = '@Rarezone1'
 
 # إعدادات الاتصال بـ MongoDB
 MONGO_URI = os.environ.get("MONGO_URI")
@@ -18,7 +18,7 @@ if not MONGO_URI:
     MONGO_URI = "mongodb+srv://peter128945:peter128945@telegrambot.nvnzi6z.mongodb.net/?appName=TelegramBot"
 
 mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["telegram_bot_dev"]
+db = mongo_client["telegram_bot_v2"]
 accounts_col = db["accounts"]
 settings_col = db["settings"]
 
@@ -61,7 +61,7 @@ if accounts_col.count_documents({}) == 0:
     initial_accounts = [
         {
             "id": 0,
-            "name": "حساب 1",
+            "name": "Account 1",
             "reserved": False,
             "time_from": "",
             "time_to": "",
@@ -72,7 +72,7 @@ if accounts_col.count_documents({}) == 0:
         },
         {
             "id": 1,
-            "name": "حساب 2",
+            "name": "Account 2",
             "reserved": False,
             "time_from": "",
             "time_to": "",
@@ -87,11 +87,11 @@ if accounts_col.count_documents({}) == 0:
 def parse_time_to_minutes(time_str):
     try:
         time_str = time_str.strip()
-        is_pm = any(word in time_str for word in ["مساء", "م", "pm", "PM"])
-        is_am = any(word in time_str for word in ["صباح", "ص", "am", "AM"])
+        is_pm = any(word in time_str for word in ["pm", "PM"])
+        is_am = any(word in time_str for word in ["am", "AM"])
         
         clean_time = time_str
-        for word in ["مساءاً", "مساءا", "مساء", "م", "صباحاً", "صباحا", "صباح", "ص", "pm", "am", "PM", "AM"]:
+        for word in ["pm", "am", "PM", "AM"]:
             clean_time = clean_time.replace(word, "")
         clean_time = clean_time.strip()
 
@@ -116,16 +116,14 @@ def parse_time_to_minutes(time_str):
 def format_minutes_to_time_str(minutes):
     hours = minutes // 60
     mins = minutes % 60
-    am_pm = "م" if hours >= 12 else "ص"
+    am_pm = "PM" if hours >= 12 else "AM"
     display_hour = hours % 12
     if display_hour == 0: display_hour = 12
     return f"{display_hour}:{mins:02d} {am_pm}"
 
 def compress_time(t_str):
     if not t_str: return ""
-    t = t_str.replace(" صباحا", "ص").replace(" مساء", "م")
-    t = t.replace("صباحا", "ص").replace("مساء", "م")
-    t = t.replace("صباحاً", "ص").replace("مساءاً", "م")
+    t = t_str.replace(" AM", "AM").replace(" PM", "PM")
     t = t.replace(":00", "") 
     t = t.replace(":", ".")  
     t = t.replace(" ", "")   
@@ -137,19 +135,19 @@ def channel_booking_markup():
     total_accounts = len(accounts)
     available_accounts = sum(1 for acc in accounts if not acc["reserved"])
     
-    header_title = f"💼 حالة الحسابات (متاح {available_accounts} من {total_accounts}) 💼"
+    header_title = f"💼 Accounts Status ({available_accounts} of {total_accounts} Available) 💼"
     markup.add(InlineKeyboardButton(header_title, callback_data="ignore"))
     
     markup.row(
-        InlineKeyboardButton("النشاط والحجز 🛒", callback_data="ignore"),
-        InlineKeyboardButton("الحساب 💳", callback_data="ignore")
+        InlineKeyboardButton("Activity & Booking 🛒", callback_data="ignore"),
+        InlineKeyboardButton("Account 💳", callback_data="ignore")
     )
     
     for a in accounts:
         is_account_vip = a.get("is_vip", False)
         
-        display_name = "💎حساب السهرة" if is_account_vip else a['name']
-        booking_intent = f"أرغب في حجز الحساب المميز 💎 ({a['name']}) للسهرة" if is_account_vip else f"أرغب في الحجز أو الاستفسار عن {a['name']}"
+        display_name = "💎 VIP Account" if is_account_vip else a['name']
+        booking_intent = f"I want to book the VIP account 💎 ({a['name']}) for the evening" if is_account_vip else f"I want to book or inquire about {a['name']}"
         
         encoded_msg = urllib.parse.quote(booking_intent)
         booking_link = f"https://t.me/RareZone11?text={encoded_msg}"
@@ -160,13 +158,13 @@ def channel_booking_markup():
             t_to = compress_time(a['time_to'])
             
             if t_from and t_to:
-                status_text = f"\u202B❌{t_from}-{t_to}\u202C"
+                status_text = f"❌ {t_from}-{t_to}"
             elif t_to:
-                status_text = f"\u202B❌حتى{t_to}\u202C"
+                status_text = f"❌ Until {t_to}"
             else:
-                status_text = "\u202B❌مشغول\u202C"
+                status_text = "❌ Busy"
         else:
-            status_text = "\u202Bمتاح✅\u202C" if is_account_vip else "\u202Bمتاح✅\u202C"
+            status_text = "Available ✅" if is_account_vip else "Available ✅"
         
         markup.row(
             InlineKeyboardButton(status_text, url=booking_link),
@@ -179,37 +177,37 @@ def main_menu_markup(chat_id):
     markup = InlineKeyboardMarkup()
     for acc in load_accounts():
         if acc["reserved"]:
-            status_str = f"من {acc['time_from']} إلى {acc['time_to']}" if acc['time_from'] else f"حتى {acc['time_to']}"
+            status_str = f"From {acc['time_from']} to {acc['time_to']}" if acc['time_from'] else f"Until {acc['time_to']}"
             client_tag = f" | @{acc['client_username']}" if acc.get("client_username") else ""
             status_icon = f"❌ {status_str}{client_tag}"
         else:
-            status_icon = "متاح✅"
+            status_icon = "Available ✅"
             
         vip_star = "💎 " if acc.get("is_vip") else ""
         markup.add(InlineKeyboardButton(f"{vip_star}{acc['name']} {status_icon}", callback_data=f"toggle_{acc['id']}"))
         
-        vip_action_text = "إلغاء التمييز ✖️" if acc.get("is_vip") else "مميز 💎"
+        vip_action_text = "Remove VIP ✖️" if acc.get("is_vip") else "VIP 💎"
         markup.row(
-            InlineKeyboardButton(f"🔗 تعديل رابط {acc['name']}", callback_data=f"seturl_{acc['id']}"),
+            InlineKeyboardButton(f"🔗 Edit {acc['name']} Link", callback_data=f"seturl_{acc['id']}"),
             InlineKeyboardButton(vip_action_text, callback_data=f"togglevip_{acc['id']}"),
-            InlineKeyboardButton(f"🗑️ حذف", callback_data=f"delete_{acc['id']}")
+            InlineKeyboardButton(f"🗑️ Delete", callback_data=f"delete_{acc['id']}")
         )
         
-    markup.add(InlineKeyboardButton("➕ إضافة حساب جديد", callback_data="add_account"))
-    markup.add(InlineKeyboardButton("📢 نشر / تحديث الجدول في القناة", callback_data="post_now"))
+    markup.add(InlineKeyboardButton("➕ Add New Account", callback_data="add_account"))
+    markup.add(InlineKeyboardButton("📢 Post / Update Schedule in Channel", callback_data="post_now"))
     return markup
 
 
 def update_all_active_admin_panels():
     egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
     time_fmt = egypt_time.strftime("%I:%M:%S").lstrip("0")
-    am_pm = "مساء" if egypt_time.hour >= 12 else "صباحا"
+    am_pm = "PM" if egypt_time.hour >= 12 else "AM"
     current_time_str = f"{time_fmt} {am_pm}"
 
     for chat_id, msg_id in list(active_admin_panels.items()):
         try:
             bot.edit_message_text(
-                f"<b>لوحة تحكم الحسابات ⚙️</b>\nتم التحديث تلقائياً ⏱ ({current_time_str})",
+                f"<b>Accounts Control Panel ⚙️</b>\nAuto-updated ⏱ ({current_time_str})",
                 chat_id=chat_id,
                 message_id=msg_id,
                 parse_mode="HTML",
@@ -224,7 +222,6 @@ def auto_update_channel_message():
         return
     try:
         banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
-        caption_text = "💎 = <b>حساب السهرة المميز</b>  |  🔥 = <b>الأكثر طلباً</b>"
         media = InputMediaPhoto(banner_image_url, parse_mode="HTML")
         bot.edit_message_media(
             media=media,
@@ -253,15 +250,15 @@ def check_expiration_loop():
                             acc["warned_near_expiry"] = True
                             save_account(acc)
                             
-                            alert_msg = f"⚠️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
+                            alert_msg = f"⚠️ <b>Alert:</b> Booking for <b>{acc['name']}</b> will expire in 5 minutes!"
                             
                             alert_markup = None
                             if acc.get("client_username"):
                                 alert_markup = InlineKeyboardMarkup()
-                                ready_msg = f"مرحباً، تنبيه بخصوص حجزك لـ ({acc['name']}): سينتهي الوقت خلال 5 دقائق ⏳. هل تود التجديد؟"
+                                ready_msg = f"Hello, alert regarding your booking for ({acc['name']}): time will end in 5 minutes ⏳. Would you like to renew?"
                                 encoded_ready_msg = urllib.parse.quote(ready_msg)
                                 client_url = f"https://t.me/{acc['client_username']}?text={encoded_ready_msg}"
-                                alert_markup.add(InlineKeyboardButton(f"💬 مراسلة العميل (@{acc['client_username']})", url=client_url))
+                                alert_markup.add(InlineKeyboardButton(f"💬 Message Client (@{acc['client_username']})", url=client_url))
                             
                             for chat_id in list(active_admin_panels.keys()):
                                 try: bot.send_message(chat_id, alert_msg, parse_mode="HTML", reply_markup=alert_markup)
@@ -299,13 +296,12 @@ def post_table_to_channel(admin_chat_id):
             sent_msg = bot.send_photo(
                 CHANNEL_ID, 
                 banner_image_url,
-                
                 parse_mode="HTML",
                 reply_markup=channel_booking_markup()
             )
             set_last_posted_message_id(sent_msg.message_id)
             bot.pin_chat_message(CHANNEL_ID, sent_msg.message_id)
-            bot.send_message(admin_chat_id, "تم النشر والتثبيت في القناة بنجاح ✅", reply_markup=main_menu_markup(admin_chat_id))
+            bot.send_message(admin_chat_id, "Successfully posted and pinned in the channel ✅", reply_markup=main_menu_markup(admin_chat_id))
         else:
             try:
                 media = InputMediaPhoto(banner_image_url, parse_mode="HTML")
@@ -315,11 +311,11 @@ def post_table_to_channel(admin_chat_id):
                     message_id=last_posted_id,
                     reply_markup=channel_booking_markup()
                 )
-                bot.send_message(admin_chat_id, "تم تحديث المنشور الحالي في القناة بنجاح 🔄", reply_markup=main_menu_markup(admin_chat_id))
+                bot.send_message(admin_chat_id, "Current channel post successfully updated 🔄", reply_markup=main_menu_markup(admin_chat_id))
             except Exception as edit_err:
                 err_str = str(edit_err).lower()
                 if "message is not modified" in err_str:
-                    bot.send_message(admin_chat_id, "الجدول في القناة محدث بالفعل 🔄", reply_markup=main_menu_markup(admin_chat_id))
+                    bot.send_message(admin_chat_id, "Channel schedule is already up to date 🔄", reply_markup=main_menu_markup(admin_chat_id))
                 elif "message_id_invalid" in err_str or "message to edit not found" in err_str or "message can't be edited" in err_str:
                     sent_msg = bot.send_photo(
                         CHANNEL_ID, 
@@ -332,18 +328,18 @@ def post_table_to_channel(admin_chat_id):
                         bot.pin_chat_message(CHANNEL_ID, sent_msg.message_id)
                     except:
                         pass
-                    bot.send_message(admin_chat_id, "تم إرسال وتثبيت جدول جديد بنجاح ✅", reply_markup=main_menu_markup(admin_chat_id))
+                    bot.send_message(admin_chat_id, "New schedule successfully sent and pinned ✅", reply_markup=main_menu_markup(admin_chat_id))
                 else:
                     raise edit_err
 
     except Exception as e:
-        bot.send_message(admin_chat_id, f"فشل في التحديث:\n{e}")
+        bot.send_message(admin_chat_id, f"Update failed:\n{e}")
 
 @bot.message_handler(commands=['start', 'admin', 'control'])
 def send_welcome(message):
     sent_msg = bot.send_message(
         message.chat.id, 
-        "<b>مرحباً بك في لوحة تحكم الحسابات ⚙️</b>\nاضغط على أي حساب لتغيير حالته:", 
+        "<b>Welcome to the Accounts Control Panel ⚙️</b>\nClick on any account to change its status:", 
         parse_mode="HTML", 
         reply_markup=main_menu_markup(message.chat.id)
     )
@@ -359,13 +355,13 @@ def handle_callbacks(call):
     active_admin_panels[call.message.chat.id] = call.message.message_id
 
     if call.data == "post_now":
-        bot.answer_callback_query(call.id, "جاري تحديث النشر في القناة...")
+        bot.answer_callback_query(call.id, "Updating channel post...")
         post_table_to_channel(call.message.chat.id)
         
     elif call.data == "add_account":
-        bot.answer_callback_query(call.id, "أدخل رابط الفيديو للحساب الجديد")
+        bot.answer_callback_query(call.id, "Enter video link for the new account")
         msg = bot.edit_message_text(
-            "<b>➕ إضافة حساب جديد</b>\nمن فضلك أرسل الآن رابط الحساب:",
+            "<b>➕ Add New Account</b>\nPlease send the account link now:",
             call.message.chat.id,
             call.message.message_id,
             parse_mode="HTML"
@@ -376,9 +372,9 @@ def handle_callbacks(call):
         acc_id = int(call.data.split("_")[1])
         acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
         if acc:
-            bot.answer_callback_query(call.id, f"أدخل رابط لـ {acc['name']}")
+            bot.answer_callback_query(call.id, f"Enter link for {acc['name']}")
             msg = bot.edit_message_text(
-                f"<b>🔗 تعديل رابط الحساب: {acc['name']}</b>\nمن فضلك أرسل الرابط الجديد:",
+                f"<b>🔗 Edit Account Link: {acc['name']}</b>\nPlease send the new link:",
                 call.message.chat.id,
                 call.message.message_id,
                 parse_mode="HTML"
@@ -392,11 +388,11 @@ def handle_callbacks(call):
             acc["is_vip"] = not acc.get("is_vip", False)
             save_account(acc)
             
-            status_msg = "تم تمييز الحساب بنجاح ⭐" if acc["is_vip"] else "تم إزالة التمييز ✖️"
+            status_msg = "Account successfully marked as VIP ⭐" if acc["is_vip"] else "VIP status removed ✖️"
             bot.answer_callback_query(call.id, status_msg)
             
             bot.edit_message_text(
-                "<b>لوحة تحكم الحسابات ⚙️</b>\nتم تحديث حالة الحساب:", 
+                "<b>Accounts Control Panel ⚙️</b>\nAccount status updated:", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML", 
@@ -411,16 +407,16 @@ def handle_callbacks(call):
         remaining_accounts = load_accounts()
         for index, acc in enumerate(remaining_accounts):
             acc["id"] = index
-            acc["name"] = f"حساب {index + 1}"
+            acc["name"] = f"Account {index + 1}"
             
         accounts_col.delete_many({})
         
         if remaining_accounts:
             accounts_col.insert_many(remaining_accounts)
             
-        bot.answer_callback_query(call.id, "تم حذف الحساب وإعادة ترتيب الباقي بنجاح ✅")
+        bot.answer_callback_query(call.id, "Account deleted and remaining accounts reordered successfully ✅")
         bot.edit_message_text(
-            "<b>لوحة تحكم الحسابات ⚙️</b>\nتم تحديث القائمة بعد الحذف (مع حفظ الروابط الأصلية):", 
+            "<b>Accounts Control Panel ⚙️</b>\nList updated after deletion (original links preserved):", 
             call.message.chat.id, 
             call.message.message_id, 
             parse_mode="HTML", 
@@ -440,9 +436,9 @@ def handle_callbacks(call):
             acc["client_username"] = ""
             acc["warned_near_expiry"] = False
             save_account(acc)
-            bot.answer_callback_query(call.id, f"تم تحويل {acc['name']} إلى متاح ✅")
+            bot.answer_callback_query(call.id, f"{acc['name']} is now Available ✅")
             bot.edit_message_text(
-                "<b>لوحة تحكم الحسابات ⚙️</b>\nتم التحديث:", 
+                "<b>Accounts Control Panel ⚙️</b>\nUpdated:", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML", 
@@ -451,11 +447,11 @@ def handle_callbacks(call):
             auto_update_channel_message()
         else:
             markup = InlineKeyboardMarkup()
-            markup.add(InlineKeyboardButton("1️⃣ إدخال وقت الانتهاء فقط", callback_data=f"timeopt_1_{acc_id}"))
-            markup.add(InlineKeyboardButton("2️⃣ إدخال وقت البدء والانتهاء", callback_data=f"timeopt_2_{acc_id}"))
+            markup.add(InlineKeyboardButton("1️⃣ Enter End Time Only", callback_data=f"timeopt_1_{acc_id}"))
+            markup.add(InlineKeyboardButton("2️⃣ Enter Start and End Time", callback_data=f"timeopt_2_{acc_id}"))
             
             bot.edit_message_text(
-                f"<b>تعديل الحساب: {acc['name']} ⚙️</b>\nاختر طريقة تحديد الوقت:", 
+                f"<b>Edit Account: {acc['name']} ⚙️</b>\nChoose time setting method:", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML", 
@@ -467,7 +463,7 @@ def handle_callbacks(call):
         acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
         if acc:
             msg = bot.edit_message_text(
-                f"<b>الطريقة 1: وقت الانتهاء فقط ⏰</b>\nأدخل وقت الانتهاء لـ {acc['name']} (مثال: <code>9م</code> أو <code>9:30 مساء</code>):", 
+                f"<b>Method 1: End Time Only ⏰</b>\nEnter end time for {acc['name']} (e.g., <code>9PM</code> or <code>9:30 PM</code>):", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML"
@@ -479,7 +475,7 @@ def handle_callbacks(call):
         acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
         if acc:
             msg = bot.edit_message_text(
-                f"<b>الطريقة 2: وقت البدء والانتهاء ⏳</b>\nأدخل وقت البدء ثم فاصلة (,) ثم وقت الانتهاء لـ {acc['name']}\n(مثال: <code>8م, 10م</code>):", 
+                f"<b>Method 2: Start & End Time ⏳</b>\nEnter start time, then a comma (,), then end time for {acc['name']}\n(e.g., <code>8PM, 10PM</code>):", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML"
@@ -493,18 +489,18 @@ def handle_callbacks(call):
         acc_id = int(parts[2])
         
         if action == "skip":
-            bot.answer_callback_query(call.id, "تم تخطي الفاتورة ✅")
+            bot.answer_callback_query(call.id, "Invoice skipped ✅")
             bot.edit_message_text(
-                "<b>لوحة تحكم الحسابات ⚙️</b>\nتم حفظ الحجز بنجاح ✅", 
+                "<b>Accounts Control Panel ⚙️</b>\nBooking saved successfully ✅", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML", 
                 reply_markup=main_menu_markup(call.message.chat.id)
             )
         elif action == "create":
-            bot.answer_callback_query(call.id, "جاري إعداد الفاتورة...")
+            bot.answer_callback_query(call.id, "Preparing invoice...")
             msg = bot.edit_message_text(
-                "<b>🧾 إنشاء فاتورة جديدة</b>\nأدخل السعر المطلوب (أرقام فقط، مثال: <code>8</code> أو <code>25</code>):", 
+                "<b>🧾 Create New Invoice</b>\nEnter the required price (numbers only, e.g., <code>8</code> or <code>25</code>):", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML"
@@ -516,7 +512,7 @@ def process_new_account_url(message):
     accounts = load_accounts()
     
     new_id = len(accounts)
-    new_name = f"حساب {new_id + 1}"
+    new_name = f"Account {new_id + 1}"
     
     new_account = {
         "id": new_id,
@@ -534,7 +530,7 @@ def process_new_account_url(message):
     
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>لوحة تحكم الحسابات ⚙️</b>\nتم إضافة ({new_name}) بنجاح ✅", 
+        f"<b>Accounts Control Panel ⚙️️</b>\n({new_name}) added successfully ✅", 
         parse_mode="HTML", 
         reply_markup=main_menu_markup(message.chat.id)
     )
@@ -549,7 +545,7 @@ def process_time_input_end_only(message, acc_id):
     target_minutes = parse_time_to_minutes(time_text)
     
     if target_minutes is None:
-        sent_msg = bot.send_message(message.chat.id, "<b>⚠️ صيغة الوقت غير صحيحة. يرجى المحاولة مرة أخرى.</b>", parse_mode="HTML", reply_markup=main_menu_markup(message.chat.id))
+        sent_msg = bot.send_message(message.chat.id, "<b>⚠️ Incorrect time format. Please try again.</b>", parse_mode="HTML", reply_markup=main_menu_markup(message.chat.id))
         active_admin_panels[message.chat.id] = sent_msg.message_id
         return
 
@@ -563,7 +559,7 @@ def process_time_input_end_only(message, acc_id):
     
     msg = bot.send_message(
         message.chat.id, 
-        f"<b>👤 ربط يوزر العميل (اختياري)</b>\nأرسل يوزر تليجرام العميل لـ {acc['name']} (مثال: <code>@username</code>) لتنبيهه قبل الانتهاء بـ 5 دقائق، أو أرسل <b>تخطي</b>:", 
+        f"<b>👤 Link Client Username (Optional)</b>\nSend the client's Telegram username for {acc['name']} (e.g., <code>@username</code>) to alert them 5 mins before expiry, or send <b>skip</b>:", 
         parse_mode="HTML"
     )
     bot.register_next_step_handler(msg, process_client_username, acc_id)
@@ -573,13 +569,13 @@ def process_time_input_start_end(message, acc_id):
     acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
     if not acc: return
     
-    if "،" in text:
-        parts = text.split("،")
+    if "," in text:
+        parts = text.split(",")
     else:
         parts = text.split(",")
         
     if len(parts) != 2:
-        sent_msg = bot.send_message(message.chat.id, "<b>⚠️ يجب إدخال وقتين يفصل بينهما فاصلة (,)</b>", parse_mode="HTML", reply_markup=main_menu_markup(message.chat.id))
+        sent_msg = bot.send_message(message.chat.id, "<b>⚠️ You must enter two times separated by a comma (,)</b>", parse_mode="HTML", reply_markup=main_menu_markup(message.chat.id))
         active_admin_panels[message.chat.id] = sent_msg.message_id
         return
         
@@ -590,7 +586,7 @@ def process_time_input_start_end(message, acc_id):
     end_minutes = parse_time_to_minutes(end_time_str)
     
     if start_minutes is None or end_minutes is None:
-        sent_msg = bot.send_message(message.chat.id, "<b>⚠️ صيغة الوقت غير صحيحة. حاول مرة أخرى.</b>", parse_mode="HTML", reply_markup=main_menu_markup(message.chat.id))
+        sent_msg = bot.send_message(message.chat.id, "<b>⚠️ Incorrect time format. Please try again.</b>", parse_mode="HTML", reply_markup=main_menu_markup(message.chat.id))
         active_admin_panels[message.chat.id] = sent_msg.message_id
         return
         
@@ -605,7 +601,7 @@ def process_time_input_start_end(message, acc_id):
     
     msg = bot.send_message(
         message.chat.id, 
-        f"<b>👤 ربط يوزر العميل (اختياري)</b>\nأرسل يوزر تليجرام العميل لـ {acc['name']} (مثال: <code>@username</code>) لتنبيهه قبل الانتهاء بـ 5 دقائق، أو أرسل <b>تخطي</b>:", 
+        f"<b>👤 Link Client Username (Optional)</b>\nSend the client's Telegram username for {acc['name']} (e.g., <code>@username</code>) to alert them 5 mins before expiry, or send <b>skip</b>:", 
         parse_mode="HTML"
     )
     bot.register_next_step_handler(msg, process_client_username, acc_id)
@@ -615,7 +611,7 @@ def process_client_username(message, acc_id):
     if not acc: return
     
     raw_user = message.text.strip()
-    if raw_user not in ["تخطي", "لا", "-", "skip"]:
+    if raw_user.lower() not in ["skip", "no", "-"]:
         clean_user = raw_user.replace("@", "").strip()
         acc["client_username"] = clean_user
     else:
@@ -627,13 +623,13 @@ def process_client_username(message, acc_id):
     
     invoice_markup = InlineKeyboardMarkup()
     invoice_markup.row(
-        InlineKeyboardButton("🧾 إنشاء فاتورة", callback_data=f"invoice_create_{acc_id}"),
-        InlineKeyboardButton("⏭️ تخطي", callback_data=f"invoice_skip_{acc_id}")
+        InlineKeyboardButton("🧾 Create Invoice", callback_data=f"invoice_create_{acc_id}"),
+        InlineKeyboardButton("⏭️ Skip", callback_data=f"invoice_skip_{acc_id}")
     )
     
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>تم حفظ الحجز بنجاح لـ {acc['name']} ✅</b>\nهل ترغب في إنشاء فاتورة سريعة وإرسالها للعميل؟", 
+        f"<b>Booking successfully saved for {acc['name']} ✅</b>\nWould you like to generate a quick invoice and send it to the client?", 
         parse_mode="HTML", 
         reply_markup=invoice_markup
     )
@@ -644,35 +640,35 @@ def process_invoice_price(message, acc_id):
     acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
     if not acc: return
     
-    time_display = f"من {acc['time_from']} إلى {acc['time_to']}" if acc['time_from'] else f"حتى {acc['time_to']}"
-    acc_name_display = "💎 حساب السهرة 💎" if acc.get("is_vip") else acc['name']
+    time_display = f"From {acc['time_from']} to {acc['time_to']}" if acc['time_from'] else f"Until {acc['time_to']}"
+    acc_name_display = "💎 VIP Account 💎" if acc.get("is_vip") else acc['name']
     
     admin_invoice_text = (
         f"<b>⚜️ R A R E   Z O N E ⚜️</b>\n"
         f"Luxury Account Rentals\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"مرحباً بك يا غالي 🤍\n"
-        f"تم تجهيز طلبك بنجاح، تفاصيل الحجز:\n\n"
-        f"🛒 | <b>الحساب:</b> {acc_name_display}\n"
-        f"⏳ | <b>المدة:</b> {time_display}\n"
-        f"💵 | <b>الإجمالي المطلوب:</b> {price_text}$\n"
+        f"Welcome dear 🤍\n"
+        f"Your order is ready. Booking details:\n\n"
+        f"🛒 | <b>Account:</b> {acc_name_display}\n"
+        f"⏳ | <b>Duration:</b> {time_display}\n"
+        f"💵 | <b>Total Required:</b> {price_text}$\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"<i>يرجى إتمام التحويل وإرسال إثبات الدفع (سكرين شوت)\n"
-        f"لاستلام بيانات الدخول فوراً ✅</i>"
+        f"<i>Please complete the transfer and send the payment proof (screenshot)\n"
+        f"to receive login details immediately ✅</i>"
     )
 
     client_invoice_text = (
         f"⚜️ R A R E   Z O N E ⚜️\n"
         f"Luxury Account Rentals\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"مرحباً بك يا غالي 🤍\n"
-        f"تم تجهيز طلبك بنجاح، تفاصيل الحجز:\n\n"
-        f"🛒 | الحساب: {acc_name_display}\n"
-        f"⏳ | المدة: {time_display}\n"
-        f"💵 | الإجمالي المطلوب: {price_text}$\n"
+        f"Welcome dear 🤍\n"
+        f"Your order is ready. Booking details:\n\n"
+        f"🛒 | Account: {acc_name_display}\n"
+        f"⏳ | Duration: {time_display}\n"
+        f"💵 | Total Required: {price_text}$\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"يرجى إتمام التحويل وإرسال إثبات الدفع (سكرين شوت)\n"
-        f"لاستلام بيانات الدخول فوراً ✅"
+        f"Please complete the transfer and send the payment proof (screenshot)\n"
+        f"to receive login details immediately ✅"
     )
     
     encoded_invoice = urllib.parse.quote(client_invoice_text)
@@ -680,15 +676,15 @@ def process_invoice_price(message, acc_id):
     
     if acc.get("client_username"):
         client_link = f"https://t.me/{acc['client_username']}?text={encoded_invoice}"
-        client_action_markup.add(InlineKeyboardButton(f"💬 إرسال الفاتورة لـ @{acc['client_username']}", url=client_link))
+        client_action_markup.add(InlineKeyboardButton(f"💬 Send Invoice to @{acc['client_username']}", url=client_link))
     else:
-        client_action_markup.add(InlineKeyboardButton("نسخ الفاتورة (لا يوجد يوزر)", callback_data="ignore"))
+        client_action_markup.add(InlineKeyboardButton("Copy Invoice (No Username)", callback_data="ignore"))
     
-    client_action_markup.add(InlineKeyboardButton("🔙 العودة للوحة التحكم", callback_data=f"invoice_skip_{acc_id}"))
+    client_action_markup.add(InlineKeyboardButton("🔙 Back to Control Panel", callback_data=f"invoice_skip_{acc_id}"))
 
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>فاتورة جاهزة:</b>\n\n{admin_invoice_text}", 
+        f"<b>Invoice Ready:</b>\n\n{admin_invoice_text}", 
         parse_mode="HTML", 
         reply_markup=client_action_markup
     )
@@ -706,7 +702,7 @@ def process_url_update(message, acc_id):
         
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>لوحة تحكم الحسابات ⚙️</b>\nتم تحديث الرابط بنجاح ✅", 
+        f"<b>Accounts Control Panel ⚙️</b>\nLink updated successfully ✅", 
         parse_mode="HTML", 
         reply_markup=main_menu_markup(message.chat.id)
     )
