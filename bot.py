@@ -9,8 +9,8 @@ from flask import Flask
 from pymongo import MongoClient
 
 # التوكين ويوزر القناة الخاصين بك
-API_TOKEN = '8772014434:AAEozCH_-FK3AL7A7KhOIRtG41DUouBOPsQ'
-CHANNEL_ID = '@Rarezone1'
+API_TOKEN = '8949480557:AAEKtRsRNXzKl0NVvtZseQk0oBw7_C6VrYU'
+CHANNEL_ID = '@Client128945'
 
 # إعدادات الاتصال بـ MongoDB
 MONGO_URI = os.environ.get("MONGO_URI")
@@ -18,7 +18,7 @@ if not MONGO_URI:
     MONGO_URI = "mongodb+srv://peter128945:peter128945@telegrambot.nvnzi6z.mongodb.net/?appName=TelegramBot"
 
 mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["telegram_bot_v2"]
+db = mongo_client["telegram_bot_dev"]
 accounts_col = db["accounts"]
 settings_col = db["settings"]
 
