@@ -255,7 +255,7 @@ def check_expiration_loop():
                             alert_markup = None
                             if acc.get("client_username"):
                                 alert_markup = InlineKeyboardMarkup()
-                                ready_msg = f"Hello, alert regarding your booking for ({acc['name']}): time will end in 5 minutes ⏳. Would you like to renew?"
+                                ready_msg = f"Hello! Just a reminder that your booking for ({acc['name']}) will expire in 5 minutes ⏳. Would you like to renew?"
                                 encoded_ready_msg = urllib.parse.quote(ready_msg)
                                 client_url = f"https://t.me/{acc['client_username']}?text={encoded_ready_msg}"
                                 alert_markup.add(InlineKeyboardButton(f"💬 Message Client (@{acc['client_username']})", url=client_url))
@@ -530,7 +530,7 @@ def process_new_account_url(message):
     
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>Accounts Control Panel ⚙️️</b>\n({new_name}) added successfully ✅", 
+        f"<b>Accounts Control Panel ⚙</b>\n({new_name}) added successfully ✅", 
         parse_mode="HTML", 
         reply_markup=main_menu_markup(message.chat.id)
     )
@@ -661,7 +661,7 @@ def process_invoice_price(message, acc_id):
         f"⚜️ R A R E   Z O N E ⚜️\n"
         f"Luxury Account Rentals\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Welcome dear 🤍\n"
+        f"Welcome! 🤍\n"
         f"Your order is ready. Booking details:\n\n"
         f"🛒 | Account: {acc_name_display}\n"
         f"⏳ | Duration: {time_display}\n"
