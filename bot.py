@@ -125,7 +125,8 @@ def format_minutes_to_time_str(minutes):
 
 def compress_time(t_str):
     if not t_str: return ""
-    t = t_str.replace(" AM", "AM").replace(" PM", "PM")
+    # تحويل النص ليكون بحروف صغيرة am / pm وإزالة المسافات
+    t = t_str.lower()
     t = t.replace(":00", "") 
     t = t.replace(":", ".")  
     t = t.replace(" ", "")   
@@ -161,11 +162,18 @@ def channel_booking_markup():
             t_to = compress_time(a['time_to'])
             
             if t_from and t_to:
-                status_text = f"❌ {t_from}-{t_to}"
+                # إزالة am أو pm من وقت البداية إذا كانت متطابقة مع وقت النهاية
+                if t_from.endswith('pm') and t_to.endswith('pm'):
+                    t_from = t_from[:-2]
+                elif t_from.endswith('am') and t_to.endswith('am'):
+                    t_from = t_from[:-2]
+                
+                status_text = f"❌{t_from}-{t_to}"
             elif t_to:
-                status_text = f"❌ Until {t_to}"
+                # استخدام To بدلاً من Until لتوفير مساحة في شاشة الموبايل
+                status_text = f"❌To {t_to}"
             else:
-                status_text = "❌ Busy"
+                status_text = "❌Busy"
         else:
             status_text = "Available ✅" if is_account_vip else "Available ✅"
         
