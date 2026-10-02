@@ -28,7 +28,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is running with Advanced Sales Reports!"
+    return "Bot is running with Sales Reports!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -132,12 +132,12 @@ def compress_time(t_str):
     t = t.replace(" ", "")   
     return t
 
-# --- دوال التقارير ---
+# --- دالة استخراج التقارير الجديدة ---
 def generate_sales_report():
     egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
     today_str = egypt_time.strftime("%Y-%m-%d")
     month_str = egypt_time.strftime("%Y-%m")
-    start_of_week_date = (egypt_time - timedelta(days=egypt_time.weekday())).date()
+    start_of_week_date = (egypt_time - timedelta(days=egypt_time.weekday())).date() # الإثنين هو بداية الأسبوع
 
     daily_total, daily_count = 0.0, 0
     weekly_total, weekly_count = 0.0, 0
@@ -147,14 +147,17 @@ def generate_sales_report():
         price = float(sale.get("price", 0))
         d_str = sale.get("date_str", "")
         
+        # مبيعات اليوم
         if d_str == today_str:
             daily_total += price
             daily_count += 1
             
+        # مبيعات الشهر
         if d_str.startswith(month_str):
             monthly_total += price
             monthly_count += 1
             
+        # مبيعات الأسبوع
         try:
             sale_date = datetime.strptime(d_str, "%Y-%m-%d").date()
             if sale_date >= start_of_week_date:
@@ -164,7 +167,7 @@ def generate_sales_report():
             pass
 
     report = (
-        f"<b>📊 التقرير العام للمبيعات</b>\n"
+        f"<b>📊 تقارير المبيعات والأرباح</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
         f"<b>📅 اليوم:</b>\n"
         f"▪️ الحجوزات: {daily_count} حجز\n"
@@ -179,61 +182,6 @@ def generate_sales_report():
     )
     return report
 
-def generate_account_report(acc_id):
-    acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
-    if not acc: return "الحساب غير موجود."
-
-    egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
-    today_str = egypt_time.strftime("%Y-%m-%d")
-    month_str = egypt_time.strftime("%Y-%m")
-    start_of_week_date = (egypt_time - timedelta(days=egypt_time.weekday())).date()
-
-    daily_total, daily_count = 0.0, 0
-    weekly_total, weekly_count = 0.0, 0
-    monthly_total, monthly_count = 0.0, 0
-    all_time_total, all_time_count = 0.0, 0
-
-    for sale in sales_col.find({"account_id": acc_id}):
-        price = float(sale.get("price", 0))
-        d_str = sale.get("date_str", "")
-        
-        all_time_total += price
-        all_time_count += 1
-
-        if d_str == today_str:
-            daily_total += price
-            daily_count += 1
-            
-        if d_str.startswith(month_str):
-            monthly_total += price
-            monthly_count += 1
-            
-        try:
-            sale_date = datetime.strptime(d_str, "%Y-%m-%d").date()
-            if sale_date >= start_of_week_date:
-                weekly_total += price
-                weekly_count += 1
-        except:
-            pass
-
-    report = (
-        f"<b>💳 تقرير مبيعات: {acc['name']}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"<b>📅 اليوم:</b>\n"
-        f"▪️ الحجوزات: {daily_count} حجز\n"
-        f"▪️ الأرباح: {daily_total:g}$\n\n"
-        f"<b>🗓 هذا الأسبوع:</b>\n"
-        f"▪️ الحجوزات: {weekly_count} حجز\n"
-        f"▪️ الأرباح: {weekly_total:g}$\n\n"
-        f"<b>📆 هذا الشهر:</b>\n"
-        f"▪️ الحجوزات: {monthly_count} حجز\n"
-        f"▪️ الأرباح: {monthly_total:g}$\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"<b>💰 إجمالي الأرباح التاريخية:</b> {all_time_total:g}$ ({all_time_count} حجوزات)\n"
-    )
-    return report
-
-# --- واجهات المستخدم (لوحة التحكم) ---
 def channel_booking_markup():
     markup = InlineKeyboardMarkup()
     accounts = load_accounts()
@@ -296,25 +244,14 @@ def main_menu_markup(chat_id):
         markup.row(
             InlineKeyboardButton(f"🔗 تعديل رابط {acc['name']}", callback_data=f"seturl_{acc['id']}"),
             InlineKeyboardButton(vip_action_text, callback_data=f"togglevip_{acc['id']}"),
-            InlineKeyboardButton(f"🗑️️ حذف", callback_data=f"delete_{acc['id']}")
+            InlineKeyboardButton(f"🗑️ حذف", callback_data=f"delete_{acc['id']}")
         )
         
     markup.add(InlineKeyboardButton("➕ إضافة حساب جديد", callback_data="add_account"))
     markup.row(
         InlineKeyboardButton("📢 نشر / تحديث الجدول", callback_data="post_now"),
-        InlineKeyboardButton("📊 تقارير المبيعات", callback_data="sales_dashboard") # تغيير الإجراء لفتح قائمة التقارير
+        InlineKeyboardButton("📊 تقارير المبيعات", callback_data="sales_report")
     )
-    return markup
-
-def reports_menu_markup():
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("📈 التقرير العام", callback_data="sales_report_general"))
-    
-    # إضافة زر لكل حساب لتقريره المنفصل
-    for acc in load_accounts():
-        markup.add(InlineKeyboardButton(f"💳 تقرير: {acc['name']}", callback_data=f"sales_report_acc_{acc['id']}"))
-        
-    markup.add(InlineKeyboardButton("🔙 رجوع للوحة التحكم", callback_data="back_to_main"))
     return markup
 
 
@@ -370,7 +307,7 @@ def check_expiration_loop():
                             acc["warned_near_expiry"] = True
                             save_account(acc)
                             
-                            alert_msg = f"⚠️️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
+                            alert_msg = f"⚠️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
                             
                             alert_markup = None
                             if acc.get("client_username"):
@@ -506,21 +443,11 @@ def handle_callbacks(call):
 
     active_admin_panels[call.message.chat.id] = call.message.message_id
 
-    # --- إدارة قوائم التقارير ---
-    if call.data == "sales_dashboard":
-        bot.edit_message_text(
-            "<b>لوحة تقارير المبيعات 📊</b>\nالرجاء اختيار نوع التقرير المطلوب:",
-            call.message.chat.id,
-            call.message.message_id,
-            parse_mode="HTML",
-            reply_markup=reports_menu_markup()
-        )
-        return
-        
-    elif call.data == "sales_report_general":
+    # --- استدعاء التقارير والرجوع للرئيسية ---
+    if call.data == "sales_report":
         report_text = generate_sales_report()
         back_markup = InlineKeyboardMarkup()
-        back_markup.add(InlineKeyboardButton("🔙 رجوع لقائمة التقارير", callback_data="sales_dashboard"))
+        back_markup.add(InlineKeyboardButton("🔙 رجوع للوحة التحكم", callback_data="back_to_main"))
         bot.edit_message_text(
             report_text,
             call.message.chat.id,
@@ -530,20 +457,6 @@ def handle_callbacks(call):
         )
         return
         
-    elif call.data.startswith("sales_report_acc_"):
-        acc_id = int(call.data.split("_")[3])
-        report_text = generate_account_report(acc_id)
-        back_markup = InlineKeyboardMarkup()
-        back_markup.add(InlineKeyboardButton("🔙 رجوع لقائمة التقارير", callback_data="sales_dashboard"))
-        bot.edit_message_text(
-            report_text,
-            call.message.chat.id,
-            call.message.message_id,
-            parse_mode="HTML",
-            reply_markup=back_markup
-        )
-        return
-
     elif call.data == "back_to_main":
         bot.edit_message_text(
             "<b>لوحة تحكم الحسابات ⚙️</b>\nاضغط على أي حساب لتغيير حالته:", 
@@ -600,7 +513,8 @@ def handle_callbacks(call):
                 reply_markup=main_menu_markup(call.message.chat.id)
             )
             auto_update_channel_message()
-elif call.data.startswith("delete_"):
+
+    elif call.data.startswith("delete_"):
         acc_id = int(call.data.split("_")[1])
         delete_account_from_db(acc_id)
         
@@ -623,6 +537,7 @@ elif call.data.startswith("delete_"):
             reply_markup=main_menu_markup(call.message.chat.id)
         )
         auto_update_channel_message()
+        
     elif call.data.startswith("toggle_"):
         acc_id = int(call.data.split("_")[1])
         acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
@@ -953,5 +868,5 @@ if __name__ == '__main__':
     t = Thread(target=check_expiration_loop, daemon=True)
     t.start()
     
-    print("Dev bot running successfully with Sales Dashboard...")
+    print("Dev bot running successfully with Sales Reports Button...")
     bot.infinity_polling()
