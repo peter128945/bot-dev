@@ -163,7 +163,7 @@ def channel_booking_markup():
             if t_from and t_to:
                 status_text = f"❌ {t_from}-{t_to}"
             elif t_to:
-                status_text = f"❌ Until {t_to}"
+                status_text = f"❌ TO {t_to}"
             else:
                 status_text = "❌ Busy"
         else:
@@ -717,7 +717,7 @@ def process_invoice_price(message, acc_id):
     )
 
     # واجهة العميل (إنجليزي)
-    time_display_client = f"From {acc['time_from']} to {acc['time_to']}" if acc['time_from'] else f"Until {acc['time_to']}"
+    time_display_client = f"From {acc['time_from']} to {acc['time_to']}" if acc['time_from'] else f"TO {acc['time_to']}"
     acc_name_display_client = "💎 VIP Account 💎" if acc.get("is_vip") else acc['name']
 
     client_invoice_text = (
