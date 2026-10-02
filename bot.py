@@ -68,7 +68,8 @@ if accounts_col.count_documents({}) == 0:
             "post_url": "https://t.me/Rarezone1/1",
             "client_username": "",
             "warned_near_expiry": False,
-            "is_vip": False
+            "is_vip": False,
+            "expire_ts": None
         },
         {
             "id": 1,
@@ -79,7 +80,8 @@ if accounts_col.count_documents({}) == 0:
             "post_url": "https://t.me/Rarezone1/2",
             "client_username": "",
             "warned_near_expiry": False,
-            "is_vip": False
+            "is_vip": False,
+            "expire_ts": None
         }
     ]
     accounts_col.insert_many(initial_accounts)
@@ -238,17 +240,18 @@ def check_expiration_loop():
     while True:
         try:
             egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
+            now_ts = egypt_time.timestamp()
             now_minutes = parse_time_to_minutes(egypt_time.strftime("%H:%M"))
             updated = False
             
             accounts_data = load_accounts()
             for acc in accounts_data:
                 if acc["reserved"] and acc["time_to"]:
-                    target_minutes = parse_time_to_minutes(acc["time_to"])
-                    if target_minutes is not None and now_minutes is not None:
-                        time_diff = target_minutes - now_minutes
+                    # النظام الجديد يعتمد على التاريخ والوقت المطلق
+                    if acc.get("expire_ts"):
+                        time_diff_minutes = (acc["expire_ts"] - now_ts) / 60.0
                         
-                        if 0 < time_diff <= 5 and not acc.get("warned_near_expiry", False):
+                        if 0 < time_diff_minutes <= 5 and not acc.get("warned_near_expiry", False):
                             acc["warned_near_expiry"] = True
                             save_account(acc)
                             
@@ -268,14 +271,47 @@ def check_expiration_loop():
                                 try: bot.send_message(chat_id, alert_msg, parse_mode="HTML", reply_markup=alert_markup)
                                 except: pass
 
-                        if now_minutes >= target_minutes:
+                        if now_ts >= acc["expire_ts"]:
                             acc["reserved"] = False
                             acc["time_from"] = ""
                             acc["time_to"] = ""
                             acc["client_username"] = ""
                             acc["warned_near_expiry"] = False
+                            acc["expire_ts"] = None
                             save_account(acc)
                             updated = True
+                            
+                    # نظام احتياطي (Fallback) للحجوزات القديمة اللي متسجلتش بالتاريخ
+                    else:
+                        target_minutes = parse_time_to_minutes(acc["time_to"])
+                        if target_minutes is not None and now_minutes is not None:
+                            time_diff = target_minutes - now_minutes
+                            
+                            if 0 < time_diff <= 5 and not acc.get("warned_near_expiry", False):
+                                acc["warned_near_expiry"] = True
+                                save_account(acc)
+                                
+                                alert_msg = f"⚠️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
+                                alert_markup = None
+                                if acc.get("client_username"):
+                                    alert_markup = InlineKeyboardMarkup()
+                                    ready_msg = f"Hello, alert regarding your booking for ({acc['name']}): time will end in 5 minutes ⏳. Would you like to renew?"
+                                    encoded_ready_msg = urllib.parse.quote(ready_msg)
+                                    client_url = f"https://t.me/{acc['client_username']}?text={encoded_ready_msg}"
+                                    alert_markup.add(InlineKeyboardButton(f"💬 مراسلة العميل (@{acc['client_username']})", url=client_url))
+                                
+                                for chat_id in list(active_admin_panels.keys()):
+                                    try: bot.send_message(chat_id, alert_msg, parse_mode="HTML", reply_markup=alert_markup)
+                                    except: pass
+
+                            if now_minutes >= target_minutes:
+                                acc["reserved"] = False
+                                acc["time_from"] = ""
+                                acc["time_to"] = ""
+                                acc["client_username"] = ""
+                                acc["warned_near_expiry"] = False
+                                save_account(acc)
+                                updated = True
             
             if updated:
                 auto_update_channel_message()
@@ -439,6 +475,7 @@ def handle_callbacks(call):
             acc["time_to"] = ""
             acc["client_username"] = ""
             acc["warned_near_expiry"] = False
+            acc["expire_ts"] = None
             save_account(acc)
             bot.answer_callback_query(call.id, f"الحساب {acc['name']} متاح الآن ✅")
             bot.edit_message_text(
@@ -527,7 +564,8 @@ def process_new_account_url(message):
         "post_url": url_text if url_text.startswith("http") else "",
         "client_username": "",
         "warned_near_expiry": False,
-        "is_vip": False
+        "is_vip": False,
+        "expire_ts": None
     }
     
     save_account(new_account)
@@ -553,12 +591,20 @@ def process_time_input_end_only(message, acc_id):
         active_admin_panels[message.chat.id] = sent_msg.message_id
         return
 
+    # حساب التاريخ والوقت لتخزينه
+    egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
+    target_dt = egypt_time.replace(hour=target_minutes // 60, minute=target_minutes % 60, second=0, microsecond=0)
+    
+    if target_dt <= egypt_time:
+        target_dt += timedelta(days=1)
+
     clean_time_str = format_minutes_to_time_str(target_minutes)
 
     acc["reserved"] = True
     acc["time_to"] = clean_time_str
     acc["time_from"] = ""
     acc["warned_near_expiry"] = False
+    acc["expire_ts"] = target_dt.timestamp()
     save_account(acc)
     
     msg = bot.send_message(
@@ -594,6 +640,13 @@ def process_time_input_start_end(message, acc_id):
         active_admin_panels[message.chat.id] = sent_msg.message_id
         return
         
+    # حساب التاريخ والوقت لتخزينه
+    egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
+    target_dt = egypt_time.replace(hour=end_minutes // 60, minute=end_minutes % 60, second=0, microsecond=0)
+    
+    if target_dt <= egypt_time:
+        target_dt += timedelta(days=1)
+        
     clean_start_str = format_minutes_to_time_str(start_minutes)
     clean_end_str = format_minutes_to_time_str(end_minutes)
 
@@ -601,6 +654,7 @@ def process_time_input_start_end(message, acc_id):
     acc["time_from"] = clean_start_str
     acc["time_to"] = clean_end_str
     acc["warned_near_expiry"] = False
+    acc["expire_ts"] = target_dt.timestamp()
     save_account(acc)
     
     msg = bot.send_message(
@@ -711,7 +765,7 @@ def process_url_update(message, acc_id):
         
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>لوحة تحكم الحسابات ⚙️️</b>\nتم تحديث الرابط بنجاح ✅", 
+        f"<b>لوحة تحكم الحسابات ⚙</b>\nتم تحديث الرابط بنجاح ✅", 
         parse_mode="HTML", 
         reply_markup=main_menu_markup(message.chat.id)
     )
