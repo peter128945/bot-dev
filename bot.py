@@ -125,9 +125,7 @@ def format_minutes_to_time_str(minutes):
 
 def compress_time(t_str):
     if not t_str: return ""
-    # تحويل AM و PM إلى حروف مختصرة a و p
-    t = t_str.replace(" AM", "a").replace(" PM", "p")
-    t = t.replace("AM", "a").replace("PM", "p")
+    t = t_str.replace(" AM", "AM").replace(" PM", "PM")
     t = t.replace(":00", "") 
     t = t.replace(":", ".")  
     t = t.replace(" ", "")   
@@ -139,6 +137,7 @@ def channel_booking_markup():
     total_accounts = len(accounts)
     available_accounts = sum(1 for acc in accounts if not acc["reserved"])
     
+    # واجهة العميل (إنجليزي)
     header_title = f"💼 Acc Status ({available_accounts} of {total_accounts} Available) 💼"
     markup.add(InlineKeyboardButton(header_title, callback_data="ignore"))
     
@@ -162,15 +161,11 @@ def channel_booking_markup():
             t_to = compress_time(a['time_to'])
             
             if t_from and t_to:
-                # إذا كانت البداية والنهاية في نفس الفترة (a أو p) نحذفها من البداية لتوفير المساحة
-                if len(t_from) > 0 and len(t_to) > 0 and t_from[-1] == t_to[-1] and t_from[-1] in ['a', 'p']:
-                    t_from = t_from[:-1]
-                # إزالة المسافات لتصغير حجم الزرار
-                status_text = f"❌{t_from}-{t_to}"
+                status_text = f"❌ {t_from}-{t_to}"
             elif t_to:
-                status_text = f"❌To {t_to}"
+                status_text = f"❌ Until {t_to}"
             else:
-                status_text = "❌Busy"
+                status_text = "❌ Busy"
         else:
             status_text = "Available ✅" if is_account_vip else "Available ✅"
         
@@ -180,6 +175,7 @@ def channel_booking_markup():
         )
         
     return markup
+
 
 def main_menu_markup(chat_id):
     markup = InlineKeyboardMarkup()
