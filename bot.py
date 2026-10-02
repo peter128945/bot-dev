@@ -601,8 +601,9 @@ def handle_callbacks(call):
             )
             auto_update_channel_message()
 
-    elif call.data.startswith("delete_"):
+elif call.data.startswith("delete_"):
         acc_id = int(call.data.split("_")[1])
+        sales_col.update_many({"account_id": acc_id}, {"$set": {"account_id": None}})
         delete_account_from_db(acc_id)
         
         remaining_accounts = load_accounts()
