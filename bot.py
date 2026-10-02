@@ -136,11 +136,11 @@ def channel_booking_markup():
     available_accounts = sum(1 for acc in accounts if not acc["reserved"])
     
     # واجهة العميل (إنجليزي)
-    header_title = f"💼 Accounts Status ({available_accounts} of {total_accounts} Available) 💼"
+    header_title = f"💼 Acc Status ({available_accounts} of {total_accounts} Available) 💼"
     markup.add(InlineKeyboardButton(header_title, callback_data="ignore"))
     
     markup.row(
-        InlineKeyboardButton("Activity & Booking 🛒", callback_data="ignore"),
+        InlineKeyboardButton("Activity 🛒", callback_data="ignore"),
         InlineKeyboardButton("Account 💳", callback_data="ignore")
     )
     
