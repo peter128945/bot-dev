@@ -162,10 +162,8 @@ def channel_booking_markup():
             t_to = compress_time(a['time_to'])
             
             if t_from and t_to:
-                # إزالة am أو pm من وقت البداية إذا كانت متطابقة مع وقت النهاية
-                if t_from.endswith('pm') and t_to.endswith('pm'):
-                    t_from = t_from[:-2]
-                elif t_from.endswith('am') and t_to.endswith('am'):
+                # حذف am أو pm من وقت البداية في كل الحالات لتوفير المساحة
+                if t_from.endswith('pm') or t_from.endswith('am'):
                     t_from = t_from[:-2]
                 
                 status_text = f"❌{t_from}-{t_to}"
