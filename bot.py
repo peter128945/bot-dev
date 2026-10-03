@@ -258,7 +258,7 @@ def channel_booking_markup(channel_id=None):
         booking_intent = f"I want to book the VIP account 💎 ({a['name']}) for the evening" if is_account_vip else f"I want to book or inquire about {a['name']}"
         
         encoded_msg = urllib.parse.quote(booking_intent)
-        booking_link = f"https://t.me/RareZone11?text={encoded_msg}"
+        booking_link = f"https://t.me/MallekManger?text={encoded_msg}"
         
         # اختيار الرابط المخصص لكل قناة
         custom_url = ""
