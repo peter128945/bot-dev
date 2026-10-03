@@ -1003,34 +1003,30 @@ def process_invoice_price(message, acc_id):
     acc_name_display_admin = "حساب VIP 💎" if acc.get("is_vip") else acc['name']
     
     admin_invoice_text = (
-        f"<b>⚜️ R A R E   Z O N E ⚜️</b>\n"
+        f"<b>⚜️ 𝙈𝘼𝙇𝙇𝙀𝙆 𝗥𝗘𝗡𝗧𝗔𝗟𝗦 ⚜️</b>\n"
         f"تأجير الحسابات المميزة\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"أهلاً بك عزيزي 🤍\n"
-        f"طلبك جاهز. تفاصيل الحجز:\n\n"
+        f"تفاصيل الحجز:\n\n"
         f"🛒 | <b>الحساب:</b> {acc_name_display_admin}\n"
         f"⏳ | <b>المدة:</b> {time_display_admin}\n"
         f"💵 | <b>الإجمالي المطلوب:</b> {price_text}$\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"<i>الرجاء إتمام التحويل وإرسال إثبات الدفع (سكرين شوت)\n"
-        f"لاستلام بيانات الدخول فوراً ✅</i>"
     )
 
     time_display_client = f"From {acc['time_from']} to {acc['time_to']}" if acc['time_from'] else f"To {acc['time_to']}"
     acc_name_display_client = "💎 VIP Account 💎" if acc.get("is_vip") else acc['name']
 
     client_invoice_text = (
-        f"⚜️ R A R E   Z O N E ⚜️\n"
+        f"⚜️ 𝙈𝘼𝙇𝙇𝙀𝙆 𝗥𝗘𝗡𝗧𝗔𝗟𝗦 ⚜️\n"
         f"Luxury Account Rentals\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"Welcome dear 🤍\n"
-        f"Your order is ready. Booking details:\n\n"
+        f"Booking details:\n\n"
         f"🛒 | Account: {acc_name_display_client}\n"
         f"⏳ | Duration: {time_display_client}\n"
         f"💵 | Total Required: {price_text}$\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Please complete the transfer and send the payment proof (screenshot)\n"
-        f"to receive login details immediately ✅"
     )
     
     encoded_invoice = urllib.parse.quote(client_invoice_text)
