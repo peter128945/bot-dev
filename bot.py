@@ -10,7 +10,7 @@ from pymongo import MongoClient
 
 # التوكين ويوزرات القنوات (يمكنك إضافة أكثر من قناة في القائمة)
 API_TOKEN = '8949480557:AAGcv4NC8wrcXd2ls1PPRtersqAIa7RGQJg'
-CHANNELS = ['@Client128945', '@SecondChannelHere'] # ضع يوزر القناة الثانية هنا
+CHANNELS = ['@Client128945', '@client1289455'] # ضع يوزر القناة الثانية هنا
 
 # إعدادات الاتصال بـ MongoDB
 MONGO_URI = os.environ.get("MONGO_URI")
