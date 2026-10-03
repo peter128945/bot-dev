@@ -291,6 +291,7 @@ def channel_booking_markup(channel_id=None):
         
     return markup
 
+# --- التصميم الجديد المدمج للوحة التحكم ---
 def main_menu_markup(chat_id):
     markup = InlineKeyboardMarkup()
     for acc in load_accounts():
@@ -302,20 +303,34 @@ def main_menu_markup(chat_id):
             status_icon = "متاح ✅"
             
         vip_star = "💎 " if acc.get("is_vip") else ""
-        markup.add(InlineKeyboardButton(f"{vip_star}{acc['name']} {status_icon}", callback_data=f"toggle_{acc['id']}"))
+        markup.add(InlineKeyboardButton(f"{vip_star}{acc['name']} - {status_icon}", callback_data=f"toggle_{acc['id']}"))
         
-        vip_action_text = "إلغاء VIP ✖️" if acc.get("is_vip") else "VIP 💎"
-        markup.row(
-            InlineKeyboardButton(f"🔗 تعديل رابط {acc['name']}", callback_data=f"seturl_{acc['id']}"),
-            InlineKeyboardButton(vip_action_text, callback_data=f"togglevip_{acc['id']}"),
-            InlineKeyboardButton(f"🗑 حذف", callback_data=f"delete_{acc['id']}")
-        )
-        
-    markup.add(InlineKeyboardButton("➕ إضافة حساب جديد", callback_data="add_account"))
+    markup.row(
+        InlineKeyboardButton("⚙️ إدارة الحسابات", callback_data="admin_manage_list"),
+        InlineKeyboardButton("➕ إضافة حساب جديد", callback_data="add_account")
+    )
     markup.row(
         InlineKeyboardButton("📢 نشر / تحديث الجدول", callback_data="post_now"),
         InlineKeyboardButton("📊 تقارير المبيعات", callback_data="sales_dashboard")
     )
+    return markup
+
+def admin_manage_list_markup():
+    markup = InlineKeyboardMarkup()
+    for acc in load_accounts():
+        vip_star = "💎 " if acc.get("is_vip") else ""
+        markup.add(InlineKeyboardButton(f"إدارة: {vip_star}{acc['name']}", callback_data=f"manage_acc_{acc['id']}"))
+    markup.add(InlineKeyboardButton("🔙 رجوع للوحة التحكم", callback_data="back_to_main"))
+    return markup
+
+def admin_manage_acc_markup(acc):
+    markup = InlineKeyboardMarkup()
+    vip_action_text = "إلغاء VIP ✖️" if acc.get("is_vip") else "ترقية إلى VIP 💎"
+    
+    markup.add(InlineKeyboardButton("🔗 تعديل الروابط للقنوات", callback_data=f"seturl_{acc['id']}"))
+    markup.add(InlineKeyboardButton(vip_action_text, callback_data=f"togglevip_{acc['id']}"))
+    markup.add(InlineKeyboardButton("🗑️ حذف الحساب", callback_data=f"delete_confirm_{acc['id']}"))
+    markup.add(InlineKeyboardButton("🔙 رجوع لقائمة الإدارة", callback_data="admin_manage_list"))
     return markup
 
 def reports_menu_markup():
@@ -327,7 +342,6 @@ def reports_menu_markup():
         
     markup.add(InlineKeyboardButton("🔙 رجوع للوحة التحكم", callback_data="back_to_main"))
     return markup
-
 
 def update_all_active_admin_panels():
     egypt_time = datetime.now(timezone.utc) + timedelta(hours=3)
@@ -417,7 +431,7 @@ def check_expiration_loop():
                                 acc["warned_near_expiry"] = True
                                 save_account(acc)
                                 
-                                alert_msg = f"⚠️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
+                                alert_msg = f"⚠️️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
                                 alert_markup = None
                                 if acc.get("client_username"):
                                     alert_markup = InlineKeyboardMarkup()
@@ -512,7 +526,7 @@ def post_table_to_channel(admin_chat_id):
 def send_welcome(message):
     sent_msg = bot.send_message(
         message.chat.id, 
-        "<b>مرحباً بك في لوحة تحكم الحسابات ⚙️</b>\nاضغط على أي حساب لتغيير حالته:", 
+        "<b>مرحباً بك في لوحة تحكم الحسابات ⚙️</b>\nالرجاء اختيار الحساب المطلوب للتبديل السريع:", 
         parse_mode="HTML", 
         reply_markup=main_menu_markup(message.chat.id)
     )
@@ -565,9 +579,44 @@ def handle_callbacks(call):
         )
         return
 
+    # --- إدارة الحسابات المتقدمة (Master-Detail) ---
+    elif call.data == "admin_manage_list":
+        bot.edit_message_text(
+            "<b>⚙️ قائمة الإدارة</b>\nالرجاء اختيار الحساب الذي تريد تعديل إعداداته:", 
+            call.message.chat.id, 
+            call.message.message_id, 
+            parse_mode="HTML", 
+            reply_markup=admin_manage_list_markup()
+        )
+        return
+
+    elif call.data.startswith("manage_acc_"):
+        acc_id = int(call.data.split("_")[2])
+        acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
+        if acc:
+            status_text = "محجوز ❌" if acc["reserved"] else "متاح ✅"
+            vip_text = "VIP 💎" if acc.get("is_vip") else "عادي"
+            
+            manage_text = (
+                f"<b>⚙️ إعدادات الحساب: {acc['name']}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"▪️ <b>الحالة:</b> {status_text}\n"
+                f"▪️ <b>التصنيف:</b> {vip_text}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"ماذا تريد أن تفعل؟"
+            )
+            bot.edit_message_text(
+                manage_text, 
+                call.message.chat.id, 
+                call.message.message_id, 
+                parse_mode="HTML", 
+                reply_markup=admin_manage_acc_markup(acc)
+            )
+        return
+
     elif call.data == "back_to_main":
         bot.edit_message_text(
-            "<b>لوحة تحكم الحسابات ⚙️</b>\nاضغط على أي حساب لتغيير حالته:", 
+            "<b>مرحباً بك في لوحة تحكم الحسابات ⚙️</b>\nالرجاء اختيار الحساب المطلوب للتبديل السريع:", 
             call.message.chat.id, 
             call.message.message_id, 
             parse_mode="HTML", 
@@ -597,7 +646,7 @@ def handle_callbacks(call):
             markup = InlineKeyboardMarkup()
             for i, ch in enumerate(CHANNELS):
                 markup.add(InlineKeyboardButton(f"تعديل رابط: {ch}", callback_data=f"urlchan_{acc_id}_{i}"))
-            markup.add(InlineKeyboardButton("🔙 إلغاء", callback_data="back_to_main"))
+            markup.add(InlineKeyboardButton("🔙 رجوع لإدارة الحساب", callback_data=f"manage_acc_{acc_id}"))
             
             bot.edit_message_text(
                 f"<b>🔗 تعديل روابط: {acc['name']}</b>\nالرجاء اختيار القناة التي تريد وضع الرابط الخاص بها:",
@@ -634,17 +683,45 @@ def handle_callbacks(call):
             status_msg = "تم تمييز الحساب كـ VIP ⭐" if acc["is_vip"] else "تمت إزالة حالة VIP ✖️"
             bot.answer_callback_query(call.id, status_msg)
             
+            # تحديث صفحة الإدارة الفرعية فوراً
+            status_text = "محجوز ❌" if acc["reserved"] else "متاح ✅"
+            vip_text = "VIP 💎" if acc.get("is_vip") else "عادي"
+            manage_text = (
+                f"<b>⚙️ إعدادات الحساب: {acc['name']}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"▪️ <b>الحالة:</b> {status_text}\n"
+                f"▪️ <b>التصنيف:</b> {vip_text}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"ماذا تريد أن تفعل؟"
+            )
             bot.edit_message_text(
-                "<b>لوحة تحكم الحسابات ⚙️</b>\nتم تحديث حالة الحساب:", 
+                manage_text, 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML", 
-                reply_markup=main_menu_markup(call.message.chat.id)
+                reply_markup=admin_manage_acc_markup(acc)
             )
             auto_update_channel_message()
 
-    elif call.data.startswith("delete_"):
-        acc_id = int(call.data.split("_")[1])
+    elif call.data.startswith("delete_confirm_"):
+        acc_id = int(call.data.split("_")[2])
+        acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
+        if acc:
+            markup = InlineKeyboardMarkup()
+            markup.row(
+                InlineKeyboardButton("نعم، احذف 🗑️", callback_data=f"delete_execute_{acc_id}"),
+                InlineKeyboardButton("إلغاء ✖️", callback_data=f"manage_acc_{acc_id}")
+            )
+            bot.edit_message_text(
+                f"⚠️ <b>تأكيد الحذف</b>\nهل أنت متأكد من حذف <b>{acc['name']}</b>؟ هذا الإجراء لا يمكن التراجع عنه.", 
+                call.message.chat.id, 
+                call.message.message_id, 
+                parse_mode="HTML", 
+                reply_markup=markup
+            )
+
+    elif call.data.startswith("delete_execute_"):
+        acc_id = int(call.data.split("_")[2])
         sales_col.update_many({"account_id": acc_id}, {"$set": {"account_id": None}})
         delete_account_from_db(acc_id)
         
@@ -660,11 +737,11 @@ def handle_callbacks(call):
             
         bot.answer_callback_query(call.id, "تم حذف الحساب وإعادة ترتيب الحسابات المتبقية بنجاح ✅")
         bot.edit_message_text(
-            "<b>لوحة تحكم الحسابات ⚙️</b>\nتم تحديث القائمة بعد الحذف (تم الحفاظ على الروابط الأصلية):", 
+            "<b>⚙️ قائمة الإدارة</b>\nالرجاء اختيار الحساب الذي تريد تعديل إعداداته:", 
             call.message.chat.id, 
             call.message.message_id, 
             parse_mode="HTML", 
-            reply_markup=main_menu_markup(call.message.chat.id)
+            reply_markup=admin_manage_list_markup()
         )
         auto_update_channel_message()
         
@@ -683,7 +760,7 @@ def handle_callbacks(call):
             save_account(acc)
             bot.answer_callback_query(call.id, f"الحساب {acc['name']} متاح الآن ✅")
             bot.edit_message_text(
-                "<b>لوحة تحكم الحسابات ⚙️</b>\nتم التحديث:", 
+                "<b>مرحباً بك في لوحة تحكم الحسابات ⚙️</b>\nالرجاء اختيار الحساب المطلوب للتبديل السريع:", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML", 
@@ -694,9 +771,10 @@ def handle_callbacks(call):
             markup = InlineKeyboardMarkup()
             markup.add(InlineKeyboardButton("1️⃣ إدخال وقت الانتهاء فقط", callback_data=f"timeopt_1_{acc_id}"))
             markup.add(InlineKeyboardButton("2️⃣ إدخال وقت البدء والانتهاء", callback_data=f"timeopt_2_{acc_id}"))
+            markup.add(InlineKeyboardButton("🔙 إلغاء الحجز", callback_data="back_to_main"))
             
             bot.edit_message_text(
-                f"<b>تعديل الحساب: {acc['name']} ⚙️</b>\nاختر طريقة تحديد الوقت:", 
+                f"<b>حجز الحساب: {acc['name']} ⏳</b>\nاختر طريقة تحديد الوقت:", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML", 
@@ -735,7 +813,7 @@ def handle_callbacks(call):
         if action == "skip":
             bot.answer_callback_query(call.id, "تم تخطي الفاتورة ✅")
             bot.edit_message_text(
-                "<b>لوحة تحكم الحسابات ⚙️</b>\nتم حفظ الحجز بنجاح ✅", 
+                "<b>مرحباً بك في لوحة تحكم الحسابات ⚙️</b>\nتم حفظ الحجز بنجاح ✅", 
                 call.message.chat.id, 
                 call.message.message_id, 
                 parse_mode="HTML", 
@@ -776,7 +854,7 @@ def process_new_account_url(message):
     
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>لوحة تحكم الحسابات ⚙️</b>\nتمت إضافة ({new_name}) بنجاح ✅", 
+        f"<b>مرحباً بك في لوحة تحكم الحسابات ⚙️</b>\nتمت إضافة ({new_name}) بنجاح ✅", 
         parse_mode="HTML", 
         reply_markup=main_menu_markup(message.chat.id)
     )
@@ -988,9 +1066,9 @@ def process_url_update_channel(message, acc_id, target_channel):
         
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>لوحة تحكم الحسابات ⚙</b>\nتم تحديث الرابط لقناة {target_channel} بنجاح ✅", 
+        f"<b>⚙️ إعدادات الحساب</b>\nتم تحديث الرابط لقناة {target_channel} بنجاح ✅", 
         parse_mode="HTML", 
-        reply_markup=main_menu_markup(message.chat.id)
+        reply_markup=admin_manage_acc_markup(acc)
     )
     active_admin_panels[message.chat.id] = sent_msg.message_id
     auto_update_channel_message()
