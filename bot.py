@@ -10,7 +10,7 @@ from pymongo import MongoClient
 
 # التوكين ويوزرات القنوات (يمكنك إضافة أكثر من قناة في القائمة)
 API_TOKEN = '8949480557:AAGcv4NC8wrcXd2ls1PPRtersqAIa7RGQJg'
-CHANNELS = ['@Client128945', '@client1289455'] # ضع يوزر القناة الثانية هنا
+CHANNELS = ['@Client128945', '@SecondChannelHere'] # ضع يوزر القناة الثانية هنا
 
 # إعدادات الاتصال بـ MongoDB
 MONGO_URI = os.environ.get("MONGO_URI")
@@ -28,7 +28,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is running with Multi-Channel Sync!"
+    return "Bot is running with Multi-Channel Links Setup!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -69,6 +69,7 @@ if accounts_col.count_documents({}) == 0:
             "time_from": "",
             "time_to": "",
             "post_url": "https://t.me/Rarezone1/1",
+            "post_urls": {},
             "client_username": "",
             "warned_near_expiry": False,
             "is_vip": False,
@@ -81,6 +82,7 @@ if accounts_col.count_documents({}) == 0:
             "time_from": "",
             "time_to": "",
             "post_url": "https://t.me/Rarezone1/2",
+            "post_urls": {},
             "client_username": "",
             "warned_near_expiry": False,
             "is_vip": False,
@@ -236,7 +238,7 @@ def generate_account_report(acc_id):
     return report
 
 # --- واجهات المستخدم (لوحة التحكم) ---
-def channel_booking_markup():
+def channel_booking_markup(channel_id=None):
     markup = InlineKeyboardMarkup()
     accounts = load_accounts()
     total_accounts = len(accounts)
@@ -257,7 +259,15 @@ def channel_booking_markup():
         
         encoded_msg = urllib.parse.quote(booking_intent)
         booking_link = f"https://t.me/RareZone11?text={encoded_msg}"
-        post_link = a['post_url'] if a.get('post_url') and str(a['post_url']).startswith("http") else booking_link
+        
+        # اختيار الرابط المخصص لكل قناة
+        custom_url = ""
+        if channel_id and "post_urls" in a and channel_id in a["post_urls"]:
+            custom_url = a["post_urls"][channel_id]
+        elif a.get('post_url') and str(a['post_url']).startswith("http"):
+            custom_url = a['post_url'] # كبديل لو لسه مفيش رابط للقناة
+            
+        post_link = custom_url if custom_url.startswith("http") else booking_link
         
         if a["reserved"]:
             t_from = compress_time(a['time_from'])
@@ -351,7 +361,7 @@ def auto_update_channel_message():
                 media=media,
                 chat_id=channel_id,
                 message_id=last_posted_id,
-                reply_markup=channel_booking_markup()
+                reply_markup=channel_booking_markup(channel_id)
             )
         except Exception:
             pass
@@ -458,7 +468,7 @@ def post_table_to_channel(admin_chat_id):
                     channel_id, 
                     banner_image_url,
                     parse_mode="HTML",
-                    reply_markup=channel_booking_markup()
+                    reply_markup=channel_booking_markup(channel_id)
                 )
                 set_channel_message_id(channel_id, sent_msg.message_id)
                 try: bot.pin_chat_message(channel_id, sent_msg.message_id)
@@ -471,7 +481,7 @@ def post_table_to_channel(admin_chat_id):
                         media=media,
                         chat_id=channel_id,
                         message_id=last_posted_id,
-                        reply_markup=channel_booking_markup()
+                        reply_markup=channel_booking_markup(channel_id)
                     )
                     success_channels += 1
                 except Exception as edit_err:
@@ -483,7 +493,7 @@ def post_table_to_channel(admin_chat_id):
                             channel_id, 
                             banner_image_url, 
                             parse_mode="HTML",
-                            reply_markup=channel_booking_markup()
+                            reply_markup=channel_booking_markup(channel_id)
                         )
                         set_channel_message_id(channel_id, sent_msg.message_id)
                         try: bot.pin_chat_message(channel_id, sent_msg.message_id)
@@ -573,7 +583,7 @@ def handle_callbacks(call):
     elif call.data == "add_account":
         bot.answer_callback_query(call.id, "أرسل رابط الفيديو للحساب الجديد")
         msg = bot.edit_message_text(
-            "<b>➕ إضافة حساب جديد</b>\nالرجاء إرسال رابط الحساب الآن:",
+            "<b>➕ إضافة حساب جديد</b>\nالرجاء إرسال الرابط الافتراضي للحساب الآن:",
             call.message.chat.id,
             call.message.message_id,
             parse_mode="HTML"
@@ -584,14 +594,35 @@ def handle_callbacks(call):
         acc_id = int(call.data.split("_")[1])
         acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
         if acc:
-            bot.answer_callback_query(call.id, f"أرسل الرابط لـ {acc['name']}")
+            markup = InlineKeyboardMarkup()
+            for i, ch in enumerate(CHANNELS):
+                markup.add(InlineKeyboardButton(f"تعديل رابط: {ch}", callback_data=f"urlchan_{acc_id}_{i}"))
+            markup.add(InlineKeyboardButton("🔙 إلغاء", callback_data="back_to_main"))
+            
+            bot.edit_message_text(
+                f"<b>🔗 تعديل روابط: {acc['name']}</b>\nالرجاء اختيار القناة التي تريد وضع الرابط الخاص بها:",
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode="HTML",
+                reply_markup=markup
+            )
+
+    elif call.data.startswith("urlchan_"):
+        parts = call.data.split("_")
+        acc_id = int(parts[1])
+        ch_index = int(parts[2])
+        target_channel = CHANNELS[ch_index]
+        
+        acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
+        if acc:
+            bot.answer_callback_query(call.id)
             msg = bot.edit_message_text(
-                f"<b>🔗 تعديل رابط الحساب: {acc['name']}</b>\nالرجاء إرسال الرابط الجديد:",
+                f"<b>🔗 إعداد الرابط لقناة {target_channel}</b>\nالرجاء إرسال رابط البوست الخاص بـ {acc['name']} في هذه القناة:",
                 call.message.chat.id,
                 call.message.message_id,
                 parse_mode="HTML"
             )
-            bot.register_next_step_handler(msg, process_url_update, acc_id)
+            bot.register_next_step_handler(msg, process_url_update_channel, acc_id, target_channel)
 
     elif call.data.startswith("togglevip_"):
         acc_id = int(call.data.split("_")[1])
@@ -614,6 +645,7 @@ def handle_callbacks(call):
 
     elif call.data.startswith("delete_"):
         acc_id = int(call.data.split("_")[1])
+        sales_col.update_many({"account_id": acc_id}, {"$set": {"account_id": None}})
         delete_account_from_db(acc_id)
         
         remaining_accounts = load_accounts()
@@ -733,6 +765,7 @@ def process_new_account_url(message):
         "time_from": "",
         "time_to": "",
         "post_url": url_text if url_text.startswith("http") else "",
+        "post_urls": {},
         "client_username": "",
         "warned_near_expiry": False,
         "is_vip": False,
@@ -942,18 +975,20 @@ def process_invoice_price(message, acc_id):
     active_admin_panels[message.chat.id] = sent_msg.message_id
 
 
-def process_url_update(message, acc_id):
+def process_url_update_channel(message, acc_id, target_channel):
     url_text = message.text.strip()
     acc = accounts_col.find_one({"id": acc_id}, {"_id": 0})
     if not acc: return
     
     if url_text.startswith("http"):
-        acc["post_url"] = url_text
+        if "post_urls" not in acc:
+            acc["post_urls"] = {}
+        acc["post_urls"][target_channel] = url_text
         save_account(acc)
         
     sent_msg = bot.send_message(
         message.chat.id, 
-        f"<b>لوحة تحكم الحسابات ⚙</b>\nتم تحديث الرابط بنجاح ✅", 
+        f"<b>لوحة تحكم الحسابات ⚙</b>\nتم تحديث الرابط لقناة {target_channel} بنجاح ✅", 
         parse_mode="HTML", 
         reply_markup=main_menu_markup(message.chat.id)
     )
