@@ -363,7 +363,7 @@ def update_all_active_admin_panels():
 
 def auto_update_channel_message():
     channel_message_ids = get_channel_message_ids()
-    banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
+    banner_image_url = "https://kommodo.ai/i/9HPrW7oe2xEMMKox77pc"
     
     for channel_id in CHANNELS:
         last_posted_id = channel_message_ids.get(channel_id)
@@ -470,7 +470,7 @@ def post_table_to_channel(admin_chat_id):
         bot.send_message(admin_chat_id, "لا توجد حسابات للنشر.")
         return
 
-    banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
+    banner_image_url = "https://kommodo.ai/i/9HPrW7oe2xEMMKox77pc"
     success_channels = 0
 
     for channel_id in CHANNELS:
