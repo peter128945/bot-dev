@@ -403,7 +403,7 @@ def check_expiration_loop():
                             alert_markup = None
                             if acc.get("client_username"):
                                 alert_markup = InlineKeyboardMarkup()
-                                ready_msg = f"Hello, alert regarding your booking for ({acc['name']}): time will end in 5 minutes ⏳. Would you like to renew?"
+                                ready_msg = f"Hello, alert regarding your booking for ({acc['name']}): time will end in 5 minutes ⏳"
                                 encoded_ready_msg = urllib.parse.quote(ready_msg)
                                 client_url = f"https://t.me/{acc['client_username']}?text={encoded_ready_msg}"
                                 alert_markup.add(InlineKeyboardButton(f"💬 مراسلة العميل (@{acc['client_username']})", url=client_url))
