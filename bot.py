@@ -8,9 +8,9 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMedia
 from flask import Flask
 from pymongo import MongoClient
 
-# التوكين ويوزر القناة الخاصين بالـ Dev
+# التوكين ويوزرات القنوات (يمكنك إضافة أكثر من قناة في القائمة)
 API_TOKEN = '8949480557:AAGcv4NC8wrcXd2ls1PPRtersqAIa7RGQJg'
-CHANNEL_ID = '@Client128945'
+CHANNELS = ['@Client128945', '@client1289455'] # ضع يوزر القناة الثانية هنا
 
 # إعدادات الاتصال بـ MongoDB
 MONGO_URI = os.environ.get("MONGO_URI")
@@ -28,7 +28,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is running with Advanced Sales Reports!"
+    return "Bot is running with Multi-Channel Sync!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -36,15 +36,17 @@ def run_flask():
 
 active_admin_panels = {}
 
-# دوال التعامل مع MongoDB
-def get_last_posted_message_id():
-    doc = settings_col.find_one({"key": "last_posted_message_id"})
-    return doc["value"] if doc else None
+# --- دوال التعامل مع MongoDB المتطورة (للقنوات المتعددة) ---
+def get_channel_message_ids():
+    doc = settings_col.find_one({"key": "last_posted_message_ids"})
+    return doc["value"] if doc and "value" in doc else {}
 
-def set_last_posted_message_id(msg_id):
+def set_channel_message_id(channel, msg_id):
+    current_ids = get_channel_message_ids()
+    current_ids[channel] = msg_id
     settings_col.update_one(
-        {"key": "last_posted_message_id"},
-        {"$set": {"value": msg_id}},
+        {"key": "last_posted_message_ids"},
+        {"$set": {"value": current_ids}},
         upsert=True
     )
 
@@ -296,13 +298,13 @@ def main_menu_markup(chat_id):
         markup.row(
             InlineKeyboardButton(f"🔗 تعديل رابط {acc['name']}", callback_data=f"seturl_{acc['id']}"),
             InlineKeyboardButton(vip_action_text, callback_data=f"togglevip_{acc['id']}"),
-            InlineKeyboardButton(f"🗑️️ حذف", callback_data=f"delete_{acc['id']}")
+            InlineKeyboardButton(f"🗑 حذف", callback_data=f"delete_{acc['id']}")
         )
         
     markup.add(InlineKeyboardButton("➕ إضافة حساب جديد", callback_data="add_account"))
     markup.row(
         InlineKeyboardButton("📢 نشر / تحديث الجدول", callback_data="post_now"),
-        InlineKeyboardButton("📊 تقارير المبيعات", callback_data="sales_dashboard") # تغيير الإجراء لفتح قائمة التقارير
+        InlineKeyboardButton("📊 تقارير المبيعات", callback_data="sales_dashboard")
     )
     return markup
 
@@ -310,7 +312,6 @@ def reports_menu_markup():
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("📈 التقرير العام", callback_data="sales_report_general"))
     
-    # إضافة زر لكل حساب لتقريره المنفصل
     for acc in load_accounts():
         markup.add(InlineKeyboardButton(f"💳 تقرير: {acc['name']}", callback_data=f"sales_report_acc_{acc['id']}"))
         
@@ -337,20 +338,23 @@ def update_all_active_admin_panels():
             pass
 
 def auto_update_channel_message():
-    last_posted_id = get_last_posted_message_id()
-    if last_posted_id is None:
-        return
-    try:
-        banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
-        media = InputMediaPhoto(banner_image_url, parse_mode="HTML")
-        bot.edit_message_media(
-            media=media,
-            chat_id=CHANNEL_ID,
-            message_id=last_posted_id,
-            reply_markup=channel_booking_markup()
-        )
-    except Exception:
-        pass
+    channel_message_ids = get_channel_message_ids()
+    banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
+    
+    for channel_id in CHANNELS:
+        last_posted_id = channel_message_ids.get(channel_id)
+        if last_posted_id is None:
+            continue
+        try:
+            media = InputMediaPhoto(banner_image_url, parse_mode="HTML")
+            bot.edit_message_media(
+                media=media,
+                chat_id=channel_id,
+                message_id=last_posted_id,
+                reply_markup=channel_booking_markup()
+            )
+        except Exception:
+            pass
 
 def check_expiration_loop():
     while True:
@@ -370,7 +374,7 @@ def check_expiration_loop():
                             acc["warned_near_expiry"] = True
                             save_account(acc)
                             
-                            alert_msg = f"⚠️️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
+                            alert_msg = f"⚠️ <b>تنبيه:</b> حجز <b>{acc['name']}</b> سينتهي خلال 5 دقائق!"
                             
                             alert_markup = None
                             if acc.get("client_username"):
@@ -435,57 +439,64 @@ def check_expiration_loop():
         time.sleep(15)
 
 def post_table_to_channel(admin_chat_id):
-    last_posted_id = get_last_posted_message_id()
+    channel_message_ids = get_channel_message_ids()
     accounts = load_accounts()
+    
     if not accounts:
         bot.send_message(admin_chat_id, "لا توجد حسابات للنشر.")
         return
 
-    try:
-        banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
+    banner_image_url = "https://kommodo.ai/i/sakX2px5W1I2zT1ryoeb"
+    success_channels = 0
+
+    for channel_id in CHANNELS:
+        last_posted_id = channel_message_ids.get(channel_id)
         
-        if last_posted_id is None:
-            sent_msg = bot.send_photo(
-                CHANNEL_ID, 
-                banner_image_url,
-                parse_mode="HTML",
-                reply_markup=channel_booking_markup()
-            )
-            set_last_posted_message_id(sent_msg.message_id)
-            bot.pin_chat_message(CHANNEL_ID, sent_msg.message_id)
-            bot.send_message(admin_chat_id, "تم النشر والتثبيت في القناة بنجاح ✅", reply_markup=main_menu_markup(admin_chat_id))
-        else:
-            try:
-                media = InputMediaPhoto(banner_image_url, parse_mode="HTML")
-                bot.edit_message_media(
-                    media=media,
-                    chat_id=CHANNEL_ID,
-                    message_id=last_posted_id,
+        try:
+            if last_posted_id is None:
+                sent_msg = bot.send_photo(
+                    channel_id, 
+                    banner_image_url,
+                    parse_mode="HTML",
                     reply_markup=channel_booking_markup()
                 )
-                bot.send_message(admin_chat_id, "تم تحديث المنشور في القناة بنجاح 🔄", reply_markup=main_menu_markup(admin_chat_id))
-            except Exception as edit_err:
-                err_str = str(edit_err).lower()
-                if "message is not modified" in err_str:
-                    bot.send_message(admin_chat_id, "الجدول في القناة محدث بالفعل 🔄", reply_markup=main_menu_markup(admin_chat_id))
-                elif "message_id_invalid" in err_str or "message to edit not found" in err_str or "message can't be edited" in err_str:
-                    sent_msg = bot.send_photo(
-                        CHANNEL_ID, 
-                        banner_image_url, 
-                        parse_mode="HTML",
+                set_channel_message_id(channel_id, sent_msg.message_id)
+                try: bot.pin_chat_message(channel_id, sent_msg.message_id)
+                except: pass
+                success_channels += 1
+            else:
+                try:
+                    media = InputMediaPhoto(banner_image_url, parse_mode="HTML")
+                    bot.edit_message_media(
+                        media=media,
+                        chat_id=channel_id,
+                        message_id=last_posted_id,
                         reply_markup=channel_booking_markup()
                     )
-                    set_last_posted_message_id(sent_msg.message_id)
-                    try:
-                        bot.pin_chat_message(CHANNEL_ID, sent_msg.message_id)
-                    except:
-                        pass
-                    bot.send_message(admin_chat_id, "تم إرسال الجدول الجديد وتثبيته بنجاح ✅", reply_markup=main_menu_markup(admin_chat_id))
-                else:
-                    raise edit_err
+                    success_channels += 1
+                except Exception as edit_err:
+                    err_str = str(edit_err).lower()
+                    if "message is not modified" in err_str:
+                        success_channels += 1 # يعتبر نجاح لأن الجدول محدث بالفعل
+                    elif "message_id_invalid" in err_str or "message to edit not found" in err_str or "message can't be edited" in err_str:
+                        sent_msg = bot.send_photo(
+                            channel_id, 
+                            banner_image_url, 
+                            parse_mode="HTML",
+                            reply_markup=channel_booking_markup()
+                        )
+                        set_channel_message_id(channel_id, sent_msg.message_id)
+                        try: bot.pin_chat_message(channel_id, sent_msg.message_id)
+                        except: pass
+                        success_channels += 1
+                    else:
+                        print(f"Error editing in {channel_id}: {edit_err}")
+                        
+        except Exception as e:
+            bot.send_message(admin_chat_id, f"فشل التحديث في القناة {channel_id}:\n{e}")
 
-    except Exception as e:
-        bot.send_message(admin_chat_id, f"فشل التحديث:\n{e}")
+    if success_channels > 0:
+        bot.send_message(admin_chat_id, f"تم نشر/تحديث الجدول في {success_channels} قنوات بنجاح 🔄✅", reply_markup=main_menu_markup(admin_chat_id))
 
 @bot.message_handler(commands=['start', 'admin', 'control'])
 def send_welcome(message):
@@ -556,7 +567,7 @@ def handle_callbacks(call):
     # ----------------------------------------
 
     if call.data == "post_now":
-        bot.answer_callback_query(call.id, "جاري تحديث منشور القناة...")
+        bot.answer_callback_query(call.id, "جاري تحديث منشورات القنوات...")
         post_table_to_channel(call.message.chat.id)
         
     elif call.data == "add_account":
@@ -955,5 +966,5 @@ if __name__ == '__main__':
     t = Thread(target=check_expiration_loop, daemon=True)
     t.start()
     
-    print("Dev bot running successfully with Sales Dashboard...")
+    print("Dev bot running successfully with Multi-Channel Sync...")
     bot.infinity_polling()
